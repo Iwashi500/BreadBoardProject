@@ -192,8 +192,12 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="BreadBoard.h" />
+    <ClInclude Include="ChainPoint.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Image.h" />
+    <ClInclude Include="MyPoint.h" />
+    <ClInclude Include="OnLine.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="Sample.h" />
@@ -202,7 +206,11 @@
     <ClInclude Include="Vector.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BreadBoard.cpp" />
+    <ClCompile Include="ChainPoint.cpp" />
     <ClCompile Include="Image.cpp" />
+    <ClCompile Include="MyPoint.cpp" />
+    <ClCompile Include="OnLine.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

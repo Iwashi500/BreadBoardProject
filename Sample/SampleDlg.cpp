@@ -76,9 +76,6 @@ CSampleDlg::CSampleDlg(CWnd* pParent /*=nullptr*/)
 	m_OrgImage = NULL;
 	m_OrgBmpFileHdr = {};
 	m_OrgBmpInfo = NULL;
-
-	check_fill = {};
-	check_remove = {};
 }
 
 //デストラクタ
@@ -112,6 +109,9 @@ BEGIN_MESSAGE_MAP(CSampleDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON1, &CSampleDlg::OnBack)
 	ON_WM_TIMER()
 	ON_BN_CLICKED(IDC_BUTTON8, &CSampleDlg::OnTest)
+	ON_BN_CLICKED(IDC_BUTTON3, &CSampleDlg::OnKido)
+	ON_BN_CLICKED(IDC_BUTTON4, &CSampleDlg::OnEdgeSearch)
+	ON_BN_CLICKED(IDC_BUTTON5, &CSampleDlg::OnChangeImageFormat)
 END_MESSAGE_MAP()
 
 
@@ -505,13 +505,146 @@ void CSampleDlg::OnBack()
 	Invalidate();
 }
 
+void CSampleDlg::drawBoardPoints() {
+	std::list<MyPoint> points;
+	MyPoint base(54, 20);
+	MyPoint add(8, 8);
+
+	for (int j = 0; j < 63; j++) {
+		OnLine onLine;
+		ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
+		for (int i = 0; i < 5; i++) {
+			int y = base.y + add.y * i;
+			int x = base.x + add.x * j;
+			MyPoint point(y, x);
+			drawPoint(point, 3);
+			chain.pushNext(point);
+			onLine.push(chain);
+		}
+		breadBoard.push(onLine);
+	}
+
+	base.y = 110;
+	for (int j = 0; j < 63; j++) {
+		OnLine onLine;
+		ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
+		for (int i = 0; i < 5; i++) {
+			int y = base.y + add.y * i;
+			int x = base.x + add.x * j;
+			MyPoint point(y, x);
+			drawPoint(point, 3);
+			chain.pushNext(point);
+			onLine.push(chain);
+		}
+		breadBoard.push(onLine);
+	}
+
+	for (OnLine onLine : breadBoard.getOnLines()) {
+		drawOnLine(onLine);
+	}
+
+	//base.y = 24;
+	//base.x = 36;
+	//for (int i = 0; i < 2; i++) {
+	//	for (int j = 0; j < 59; j++) {
+	//		int y = base.y + add.y * i;
+	//		int x = base.x + add.x * j;
+	//		drawPoint(MyPoint(y, x), 3);
+	//	}
+	//}
+
+	//base.y = 165;
+	//for (int i = 0; i < 2; i++) {
+	//	for (int j = 0; j < 59; j++) {
+	//		int y = base.y + add.y * i;
+	//		int x = base.x + add.x * j;
+	//		drawPoint(MyPoint(y, x), 3);
+	//	}
+	//}
+
+	UpdateImage();
+}
+
 void CSampleDlg::OnTest()
 {	
 	CString fileName = "";
 	int fileIndex = 0;
-
 	fileName.Format(m_fileName);
 	SaveImage(m_Image, fileName, RESULT_PATH);
+
+	drawBoardPoints();
+	fileName.Format(fileName + "_%d_lines", ++fileIndex);
+	SaveImage(m_Image, fileName, RESULT_PATH);
+
+	MyPoint p1(62, 44);
+	OnLine result = breadBoard.getOnLine(p1);
+	OnLine non = breadBoard.getOnLine(MyPoint(0, 0));
+	p1.x++;
+}
+
+void CSampleDlg::drawOnLine(OnLine line) {
+	for (ChainPoint chain : line.getChains()) {
+		drawLine(chain.point1, chain.point2);
+	}
+}
+
+void CSampleDlg::drawLine(MyPoint point1, MyPoint point2) {
+	if (point1 == point2)
+		return;
+	int startY;
+	int startX;
+	int endY;
+	int endX;
+	float angle = 0;
+
+	if (point1.x == point2.x) {
+		angle = M_PI_2;
+		if (point1.y < point2.y) {
+			startY = point1.y;
+			startX = point1.x;
+			endY = point2.y;
+			endX = point2.x;
+		}
+		else {
+			startY = point2.y;
+			startX = point2.x;
+			endY = point1.y;
+			endX = point1.x;
+		}
+	}
+	else {
+		if (point1.x < point2.x) {
+			startY = point1.y;
+			startX = point1.x;
+			endY = point2.y;
+			endX = point2.x;
+		}
+		else {
+			startY = point2.y;
+			startX = point2.x;
+			endY = point1.y;
+			endX = point1.x;
+		}
+		float dy = startY - endY;
+		float dx = startX - endX;
+		angle = std::atanf(dy / dx);
+	}
+
+	float y = startY;
+	float x = startX;
+
+	while (1) {
+		x += cosf(angle);
+		y += sinf(angle);
+
+		if (x < 0 || x >= m_Image->Width || y < 0 || y >= m_Image->Height)
+			break;
+		else if ((std::fabsf(x - endX) < 1) && (std::fabsf(y - endY) < 1))
+			break;
+		m_ChangeImage->B[(int)y][(int)x] = 0;
+		m_ChangeImage->G[(int)y][(int)x] = 255;
+		m_ChangeImage->R[(int)y][(int)x] = 255;
+	}
 }
 
 void CSampleDlg::UpdateImage() {
@@ -578,4 +711,291 @@ Image* CSampleDlg::OpenImage() {
 	}
 
 	return image;
+}
+
+void CSampleDlg::OnKido()
+{
+	int i, j;
+	double dy;
+
+	//輝度化処理
+	for (i = 0; i < m_BmpInfo->bmiHeader.biHeight; i++) {
+		for (j = 0; j < m_BmpInfo->bmiHeader.biWidth; j++) {
+
+			dy = std::roundf(0.3 * m_Image->R[i][j] + 0.59 * m_Image->G[i][j] + 0.11 * m_Image->B[i][j]);
+			m_ChangeImage->R[i][j] = (unsigned char)dy;
+			m_ChangeImage->G[i][j] = (unsigned char)dy;
+			m_ChangeImage->B[i][j] = (unsigned char)dy;
+
+		}
+	}
+
+	UpdateImage();
+}
+
+void CSampleDlg::OnEdgeSearch()
+{
+	OnKido();
+
+	int filter[3][3] = { {-1, -1, -1}, {-1, 8, -1}, {-1, -1, -1} };
+
+	for (int i = 0; i < m_Image->Height; i++) {
+		for (int j = 0; j < m_Image->Width; j++) {
+			int up = (i - 1) >= 0 ? i - 1 : 0;
+			int down = (i + 1) <= m_Image->Height - 1 ? i + 1 : m_Image->Height - 1;
+			int left = (j - 1) >= 0 ? j - 1 : 0;
+			int right = (j + 1) <= m_Image->Width - 1 ? j + 1 : m_Image->Width - 1;
+			int result = 0;
+
+			result = m_Image->B[up][left] * filter[0][0]
+				+ m_Image->B[up][j] * filter[0][1]
+				+ m_Image->B[up][right] * filter[0][2]
+				+ m_Image->B[i][left] * filter[1][0]
+				+ m_Image->B[i][j] * filter[1][1]
+				+ m_Image->B[i][right] * filter[1][2]
+				+ m_Image->B[down][left] * filter[2][0]
+				+ m_Image->B[down][j] * filter[2][1]
+				+ m_Image->B[down][right] * filter[2][2];
+
+			if (result < 0)
+				result = 0;
+			else if (result > 255)
+				result = 255;
+			m_ChangeImage->B[i][j] = result;
+		}
+	}
+
+	for (int i = 0; i < m_BmpInfo->bmiHeader.biHeight; i++) {
+		for (int j = 0; j < m_BmpInfo->bmiHeader.biWidth; j++) {
+			m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - i - 1) * m_BmpInfo->bmiHeader.biWidth + j) * 3] = m_Image->B[i][j] = m_ChangeImage->B[i][j];
+			m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - i - 1) * m_BmpInfo->bmiHeader.biWidth + j) * 3 + 1] = m_Image->G[i][j] = m_ChangeImage->G[i][j] = m_ChangeImage->B[i][j];
+			m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - i - 1) * m_BmpInfo->bmiHeader.biWidth + j) * 3 + 2] = m_Image->R[i][j] = m_ChangeImage->R[i][j] = m_ChangeImage->B[i][j];
+		}
+	}
+
+	//再描画
+	Invalidate();
+}
+
+bool CSampleDlg:: checkInnerImage(int y, int x) {
+	return (0 <= y
+		&& y < m_Image->Height
+		&& 0 <= x
+		&& x < m_Image->Width);
+}
+
+void CSampleDlg::drawPoint(MyPoint point, int size) {
+	
+	int radius = size / 2;
+
+	for (int i = point.y - radius; i <= point.y + radius; i++) {
+		for (int j = point.x - radius; j <= point.x + radius; j++) {
+			if (checkInnerImage(i, j)) {
+				m_ChangeImage->B[i][j] = 0;
+				m_ChangeImage->G[i][j] = 0;
+				m_ChangeImage->R[i][j] = 255;
+			}
+		}
+	}
+}
+
+
+void CSampleDlg::OnChangeImageFormat()
+{
+	/*------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+		//パラメータ
+	int max = 2300;
+	CString ary[] = { "cut_", "result_", "remove_" };
+	CString savePath = IWI_PATH + "変換\\";
+	//CString savePath = IWI_PATH + "実験\\2-6\\表示精度\\_立ち_-40\\";
+
+	/*------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+
+
+	CDC* pDC = ((CStatic*)GetDlgItem(IDC_PICBOX))->GetDC();
+	CString inputPath;
+	CString outputPath;
+	CImage* img = new CImage();
+
+	inputPath.Format("%sa.jpg", IWI_PATH);
+	outputPath.Format("%sB.bmp", IWI_PATH);
+	img->Load(inputPath);
+	img->Save(outputPath);
+	img->Destroy();
+
+	//BMPファイルの読み込み
+	//変数の宣言
+	int i, j;
+	size_t image_size;
+	CString filename;
+	CFile file;
+	BITMAPINFOHEADER myBmpInfoHdr;
+
+	//取得したファイルをオープンする
+	filename.Format(outputPath);
+	if (!file.Open(filename, CFile::modeRead | CFile::typeBinary)) {
+		return;
+	}
+
+	//----------------------------------------------ファイル内容の読み込み処理
+
+	//ファイルヘッダ部とインフォヘッダ部を読み込む
+	file.Read(&m_BmpFileHdr, sizeof(BITMAPFILEHEADER));
+	file.Read(&myBmpInfoHdr, sizeof(BITMAPINFOHEADER));
+
+	//前回の画像イメージをいったん解放
+	if (m_BmpImage)delete[] m_BmpImage;
+	//前回使用していれば、いったんメモリ解放する
+	if (m_BmpInfo)delete[] m_BmpInfo;
+	//前回の画像処理メモリをいったん解放
+	if (m_Image)delete[] m_Image;
+	if (m_ChangeImage)delete[] m_ChangeImage;
+
+	//色情報を取得する
+	//biBitCountは1ピクセルあたりのカラー表現ビット数
+	//1,4,8,16,32がある。数字が大きいほど精細表現が可能
+	//16ビット以上と未満でカラーデータ格納が異なる
+	if (myBmpInfoHdr.biBitCount >= 16) {
+		m_BmpInfo = (LPBITMAPINFO)new char[sizeof(BITMAPINFO)];
+	}
+	else {
+		m_BmpInfo = (LPBITMAPINFO)new char[sizeof(BITMAPINFOHEADER) +
+			(1i64 << myBmpInfoHdr.biBitCount) * sizeof(RGBQUAD)];
+		file.Read(m_BmpInfo->bmiColors,
+			1i64 << (myBmpInfoHdr.biBitCount) * sizeof(RGBQUAD));
+	}
+
+	//m_BmpInfo(LPBITMAPINFO型)のmyBmpInfoHdrメンバに設定
+	m_BmpInfo->bmiHeader = myBmpInfoHdr;
+
+	//ファイル内のビットマップ実データ位置に合わせる
+	file.Seek(m_BmpFileHdr.bfOffBits, CFile::begin);
+
+	//実データ分のバイト数を確保
+	//bfsize	:ビットマップファイル全サイズ
+	//bfffBits	:先頭にあるヘッダ情報サイズ
+	image_size = m_BmpFileHdr.bfSize - m_BmpFileHdr.bfOffBits;
+	m_BmpImage = new unsigned char[image_size];
+
+	//ビットマップ実データを読み込み格納
+	file.Read(m_BmpImage, (UINT)image_size);
+
+	file.Close();
+
+	//画像処理用のメモリを動的に確保
+	m_Image = new Image(m_BmpInfo->bmiHeader.biHeight, m_BmpInfo->bmiHeader.biWidth);
+	m_ChangeImage = new Image(m_BmpInfo->bmiHeader.biHeight, m_BmpInfo->bmiHeader.biWidth);
+
+	//RGBに分けて格納する
+	if (myBmpInfoHdr.biBitCount == 24) {//フルカラーの場合
+		for (i = 0; i < m_BmpInfo->bmiHeader.biHeight; i++) {
+			for (j = 0; j < m_BmpInfo->bmiHeader.biWidth; j++) {
+				m_Image->B[m_BmpInfo->bmiHeader.biHeight - i - 1][j] = m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - 1 - i) * m_BmpInfo->bmiHeader.biWidth + j) * 3];
+				m_Image->G[m_BmpInfo->bmiHeader.biHeight - i - 1][j] = m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - 1 - i) * m_BmpInfo->bmiHeader.biWidth + j) * 3 + 1];
+				m_Image->R[m_BmpInfo->bmiHeader.biHeight - i - 1][j] = m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - 1 - i) * m_BmpInfo->bmiHeader.biWidth + j) * 3 + 2];
+			}
+		}
+	}
+	filename.Format("BB");
+	SaveImage(m_Image, filename, IWI_PATH);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	//for (CString name : ary) {
+	//	for (int k = 10; k <= max; k += 10) {
+	//		inputPath.Format("%s%s%s%d%s", IWI_PATH, "新規\\", name, k, ".jpg");
+	//		outputPath.Format("%s%s%s%d%s", IWI_PATH, "変換\\", name, k, ".bmp");
+	//		img->Load(inputPath);
+	//		img->Save(outputPath);
+	//		img->Destroy();
+
+	//		//BMPファイルの読み込み
+	//			//変数の宣言
+	//		int i, j;
+	//		size_t image_size;
+	//		CString filename;
+	//		CFile file;
+	//		BITMAPINFOHEADER myBmpInfoHdr;
+
+	//		//取得したファイルをオープンする
+	//		filename.Format(outputPath);
+	//		if (!file.Open(filename, CFile::modeRead | CFile::typeBinary)) {
+	//			return;
+	//		}
+
+	//		//----------------------------------------------ファイル内容の読み込み処理
+
+	//		//ファイルヘッダ部とインフォヘッダ部を読み込む
+	//		file.Read(&m_BmpFileHdr, sizeof(BITMAPFILEHEADER));
+	//		file.Read(&myBmpInfoHdr, sizeof(BITMAPINFOHEADER));
+
+	//		//前回の画像イメージをいったん解放
+	//		if (m_BmpImage)delete[] m_BmpImage;
+	//		//前回使用していれば、いったんメモリ解放する
+	//		if (m_BmpInfo)delete[] m_BmpInfo;
+	//		//前回の画像処理メモリをいったん解放
+	//		if (m_Image)delete[] m_Image;
+	//		if (m_ChangeImage)delete[] m_ChangeImage;
+
+	//		//色情報を取得する
+	//		//biBitCountは1ピクセルあたりのカラー表現ビット数
+	//		//1,4,8,16,32がある。数字が大きいほど精細表現が可能
+	//		//16ビット以上と未満でカラーデータ格納が異なる
+	//		if (myBmpInfoHdr.biBitCount >= 16) {
+	//			m_BmpInfo = (LPBITMAPINFO)new char[sizeof(BITMAPINFO)];
+	//		}
+	//		else {
+	//			m_BmpInfo = (LPBITMAPINFO)new char[sizeof(BITMAPINFOHEADER) +
+	//				(1i64 << myBmpInfoHdr.biBitCount) * sizeof(RGBQUAD)];
+	//			file.Read(m_BmpInfo->bmiColors,
+	//				1i64 << (myBmpInfoHdr.biBitCount) * sizeof(RGBQUAD));
+	//		}
+
+	//		//m_BmpInfo(LPBITMAPINFO型)のmyBmpInfoHdrメンバに設定
+	//		m_BmpInfo->bmiHeader = myBmpInfoHdr;
+
+	//		//ファイル内のビットマップ実データ位置に合わせる
+	//		file.Seek(m_BmpFileHdr.bfOffBits, CFile::begin);
+
+	//		//実データ分のバイト数を確保
+	//		//bfsize	:ビットマップファイル全サイズ
+	//		//bfffBits	:先頭にあるヘッダ情報サイズ
+	//		image_size = m_BmpFileHdr.bfSize - m_BmpFileHdr.bfOffBits;
+	//		m_BmpImage = new unsigned char[image_size];
+
+	//		//ビットマップ実データを読み込み格納
+	//		file.Read(m_BmpImage, (UINT)image_size);
+
+	//		file.Close();
+
+	//		//画像処理用のメモリを動的に確保
+	//		m_Image = new Image(m_BmpInfo->bmiHeader.biHeight, m_BmpInfo->bmiHeader.biWidth);
+	//		m_ChangeImage = new Image(m_BmpInfo->bmiHeader.biHeight, m_BmpInfo->bmiHeader.biWidth);
+
+	//		//RGBに分けて格納する
+	//		if (myBmpInfoHdr.biBitCount == 24) {//フルカラーの場合
+	//			for (i = 0; i < m_BmpInfo->bmiHeader.biHeight; i++) {
+	//				for (j = 0; j < m_BmpInfo->bmiHeader.biWidth; j++) {
+	//					m_Image->B[m_BmpInfo->bmiHeader.biHeight - i - 1][j] = m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - 1 - i) * m_BmpInfo->bmiHeader.biWidth + j) * 3];
+	//					m_Image->G[m_BmpInfo->bmiHeader.biHeight - i - 1][j] = m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - 1 - i) * m_BmpInfo->bmiHeader.biWidth + j) * 3 + 1];
+	//					m_Image->R[m_BmpInfo->bmiHeader.biHeight - i - 1][j] = m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - 1 - i) * m_BmpInfo->bmiHeader.biWidth + j) * 3 + 2];
+	//				}
+	//			}
+	//		}
+
+	//		filename.Format("%s%d", name, k);
+	//		SaveImage(m_Image, filename, savePath);
+	//	}
+	//}
 }

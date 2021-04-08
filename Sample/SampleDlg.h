@@ -6,7 +6,9 @@
 #include "Image.h"
 #include <vector>
 #include <algorithm>
+#include <list>
 #include "Vector.h"
+#include "BreadBoard.h"
 //#include <opencv2/opencv.hpp>
 #pragma once
 
@@ -33,9 +35,6 @@ public:
 	CString m_fileName; //開いているファイルの名前
 	CString m_filePath; //開いているファイルのパス
 
-	CButton* check_fill;
-	CButton* check_remove;
-
 	CString IWI_PATH = "C:\\Users\\IWI\\Desktop\\IWI\\";
 	CString KEYBOARD_PATH = "C:\\Users\\IWI\\Desktop\\IWI\\Keyboard\\";
 	CString RESULT_PATH = "C:\\Users\\IWI\\Desktop\\IWI\\結果\\";
@@ -60,6 +59,7 @@ protected:
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
+	BreadBoard breadBoard;
 
 public:
 	afx_msg void OnOpen();
@@ -71,10 +71,12 @@ public:
 	bool SaveImage(Image* image, CString fileName);
 	bool SaveImage(Image* image, CString fileName, CString pathName);
 	Image* OpenImage();
-
-	struct MyPoint
-	{
-		int x;
-		int y;
-	};
+	afx_msg void OnKido();
+	afx_msg void OnEdgeSearch();
+	bool checkInnerImage(int y, int x);
+	afx_msg void OnChangeImageFormat();
+	void drawPoint(MyPoint point, int size);
+	void drawBoardPoints();
+	void drawOnLine(OnLine line);
+	void drawLine(MyPoint point1, MyPoint point2);
 };
