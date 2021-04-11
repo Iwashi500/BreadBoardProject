@@ -196,6 +196,7 @@
     <ClInclude Include="ChainPoint.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Image.h" />
+    <ClInclude Include="LocalConfig.h" />
     <ClInclude Include="MyPoint.h" />
     <ClInclude Include="OnLine.h" />
     <ClInclude Include="pch.h" />

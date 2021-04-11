@@ -14,6 +14,7 @@
 #include <array>
 #include <algorithm>
 #include <list>
+#include "LocalConfig.h"
 //#include "Vector.h"
 //#include <opencv2/opencv.hpp>
 
@@ -76,6 +77,10 @@ CSampleDlg::CSampleDlg(CWnd* pParent /*=nullptr*/)
 	m_OrgImage = NULL;
 	m_OrgBmpFileHdr = {};
 	m_OrgBmpInfo = NULL;
+
+	//LocalConfigクラスの作成が必要(Local設定ファイルのため.gitignore)
+	IWI_PATH = LocalConfig::saveBasePath();
+	RESULT_PATH = LocalConfig::saveResultPath();
 }
 
 //デストラクタ
@@ -575,11 +580,6 @@ void CSampleDlg::OnTest()
 	drawBoardPoints();
 	fileName.Format(fileName + "_%d_lines", ++fileIndex);
 	SaveImage(m_Image, fileName, RESULT_PATH);
-
-	MyPoint p1(62, 44);
-	OnLine result = breadBoard.getOnLine(p1);
-	OnLine non = breadBoard.getOnLine(MyPoint(0, 0));
-	p1.x++;
 }
 
 void CSampleDlg::drawOnLine(OnLine line) {

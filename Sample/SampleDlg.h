@@ -36,9 +36,7 @@ public:
 	CString m_filePath; //開いているファイルのパス
 
 	CString IWI_PATH = "C:\\Users\\IWI\\Desktop\\IWI\\";
-	CString KEYBOARD_PATH = "C:\\Users\\IWI\\Desktop\\IWI\\Keyboard\\";
 	CString RESULT_PATH = "C:\\Users\\IWI\\Desktop\\IWI\\結果\\";
-
 
 // ダイアログ データ
 #ifdef AFX_DESIGN_TIME
