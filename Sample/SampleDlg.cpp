@@ -634,6 +634,10 @@ void CSampleDlg::drawLine(MyPoint point1, MyPoint point2) {
 	float x = startX;
 
 	while (1) {
+		m_ChangeImage->B[(int)y][(int)x] = 0;
+		m_ChangeImage->G[(int)y][(int)x] = 255;
+		m_ChangeImage->R[(int)y][(int)x] = 255;
+
 		x += cosf(angle);
 		y += sinf(angle);
 
@@ -641,9 +645,6 @@ void CSampleDlg::drawLine(MyPoint point1, MyPoint point2) {
 			break;
 		else if ((std::fabsf(x - endX) < 1) && (std::fabsf(y - endY) < 1))
 			break;
-		m_ChangeImage->B[(int)y][(int)x] = 0;
-		m_ChangeImage->G[(int)y][(int)x] = 255;
-		m_ChangeImage->R[(int)y][(int)x] = 255;
 	}
 }
 
