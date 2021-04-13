@@ -16,7 +16,7 @@
 #include <list>
 #include "LocalConfig.h"
 //#include "Vector.h"
-//#include <opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>
 
 //#include <opencv2/opencv.hpp>
 #define _USE_MATH_DEFINES

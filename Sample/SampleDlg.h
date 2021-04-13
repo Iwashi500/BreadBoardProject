@@ -7,9 +7,8 @@
 #include <vector>
 #include <algorithm>
 #include <list>
-#include "Vector.h"
 #include "BreadBoard.h"
-//#include <opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>
 #pragma once
 
 //using namespace cv;
