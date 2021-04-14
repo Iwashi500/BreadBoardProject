@@ -17,6 +17,8 @@
 #include "LocalConfig.h"
 //#include "Vector.h"
 #include <opencv2/opencv.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/imgproc/types_c.h>
 
 //#include <opencv2/opencv.hpp>
 #define _USE_MATH_DEFINES
@@ -28,6 +30,8 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+
+using namespace cv;
 
 // アプリケーションのバージョン情報に使われる CAboutDlg ダイアログ
 class CAboutDlg : public CDialogEx
@@ -94,9 +98,14 @@ CSampleDlg::~CSampleDlg()
 	if (m_Image) {
 		delete[] m_Image;
 	}
+	if (m_ChangeImage) {
+		delete[] m_ChangeImage;
+	}
 
 	if (m_OrgImage)
 		delete[] m_OrgImage;
+
+	cv::destroyAllWindows();
 }
 
 
@@ -112,11 +121,15 @@ BEGIN_MESSAGE_MAP(CSampleDlg, CDialog)
 	ON_BN_CLICKED(IDC_OPEN, &CSampleDlg::OnOpen)
 	ON_BN_CLICKED(IDC_BUTTON2, &CSampleDlg::OnSave)
 	ON_BN_CLICKED(IDC_BUTTON1, &CSampleDlg::OnBack)
-	ON_WM_TIMER()
 	ON_BN_CLICKED(IDC_BUTTON8, &CSampleDlg::OnTest)
 	ON_BN_CLICKED(IDC_BUTTON3, &CSampleDlg::OnKido)
 	ON_BN_CLICKED(IDC_BUTTON4, &CSampleDlg::OnEdgeSearch)
 	ON_BN_CLICKED(IDC_BUTTON5, &CSampleDlg::OnChangeImageFormat)
+	ON_BN_CLICKED(IDC_BUTTON6, &CSampleDlg::OnGetImage)
+	ON_BN_CLICKED(IDC_BUTTON7, &CSampleDlg::OnCameraStart)
+	ON_WM_TIMER()
+	ON_BN_CLICKED(IDC_BUTTON9, &CSampleDlg::OnChangeHSV)
+	ON_BN_CLICKED(IDC_BUTTON10, &CSampleDlg::OnCameraStop)
 END_MESSAGE_MAP()
 
 
@@ -410,6 +423,33 @@ bool CSampleDlg::SaveImage(Image* image, CString fileName) {
 	return SaveImage(image, fileName, IWI_PATH);
 }
 
+//m_Image保存で固定
+bool CSampleDlg::SaveImage(CString fileName) {
+	fileName += ".bmp";
+	//画像保存処理
+	CFile file;
+
+	//フルカラー以外の場合は省略（減色処理が必要になるので）
+	if (m_BmpInfo->bmiHeader.biBitCount != 24) {
+		MessageBox("フルカラーでない画像は保存できません", "がんばれ", MB_OK);
+		return false;
+	}
+
+	if (!file.Open(fileName, CFile::modeWrite | CFile::modeCreate | CFile::typeBinary)) {
+		MessageBox((CString)"ファイル" + fileName + "の書き込みに失敗しました", "エラー", MB_OK);
+		return false;
+	}
+
+	//ファイル内容の書き込み
+	file.Write(&m_BmpFileHdr, sizeof(BITMAPFILEHEADER));
+	file.Write(&m_BmpInfo->bmiHeader, sizeof(BITMAPINFOHEADER));
+	file.Write(m_BmpImage, m_BmpFileHdr.bfSize - m_BmpFileHdr.bfOffBits);
+
+	file.Close();
+
+	return true;
+}
+
 bool CSampleDlg::SaveImage(Image* image, CString fileName, CString pathName) {
 	//画像保存処理
 	//第8回_01追加分：拡大・縮小後のサイズに変更
@@ -572,14 +612,21 @@ void CSampleDlg::drawBoardPoints() {
 
 void CSampleDlg::OnTest()
 {	
+	if (m_fileName == "" && videoCapture.isOpened())
+		m_fileName = "camera";
+
 	CString fileName = "";
 	int fileIndex = 0;
-	fileName.Format(m_fileName);
-	SaveImage(m_Image, fileName, RESULT_PATH);
+	fileName.Format(RESULT_PATH + m_fileName + "_%d", ++fileIndex);
+	SaveImage(fileName);
 
-	drawBoardPoints();
-	fileName.Format(fileName + "_%d_lines", ++fileIndex);
-	SaveImage(m_Image, fileName, RESULT_PATH);
+	fileName.Format("%s%s_%d_hsv", RESULT_PATH, m_fileName, ++fileIndex);
+	OnChangeHSV();
+	SaveImage(fileName);
+
+	//drawBoardPoints();
+	//fileName.Format(fileName + "_%d_lines", ++fileIndex);
+	//SaveImage(m_Image, fileName, RESULT_PATH);
 }
 
 void CSampleDlg::drawOnLine(OnLine line) {
@@ -634,10 +681,12 @@ void CSampleDlg::drawLine(MyPoint point1, MyPoint point2) {
 	float x = startX;
 
 	while (1) {
-		m_ChangeImage->B[(int)y][(int)x] = 0;
-		m_ChangeImage->G[(int)y][(int)x] = 255;
-		m_ChangeImage->R[(int)y][(int)x] = 255;
-
+		if (0 < y && y < m_Image->Height
+			&& 0 < x && x < m_Image->Width) {
+			m_ChangeImage->B[(int)y][(int)x] = 0;
+			m_ChangeImage->G[(int)y][(int)x] = 255;
+			m_ChangeImage->R[(int)y][(int)x] = 255;
+		}
 		x += cosf(angle);
 		y += sinf(angle);
 
@@ -646,6 +695,38 @@ void CSampleDlg::drawLine(MyPoint point1, MyPoint point2) {
 		else if ((std::fabsf(x - endX) < 1) && (std::fabsf(y - endY) < 1))
 			break;
 	}
+}
+
+void CSampleDlg::cutRect(MyPoint upLeft, MyPoint downRight) {
+	for (int i = 0; i < m_Image->Height; i++) {
+			for (int j = 0; j < m_Image->Width; j++) {
+				if (upLeft.x < j && j < downRight.x 
+					&& upLeft.y < i && i < downRight.y){
+				}
+				else {
+					m_ChangeImage->B[i][j] = 255;
+					m_ChangeImage->G[i][j] = 255;
+					m_ChangeImage->R[i][j] = 255;
+				}
+			}
+		
+	}
+}
+
+
+
+void CSampleDlg::UpdateImage(int height, int width) {
+	//表示用
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j <width; j++) {
+			m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - i - 1) * m_BmpInfo->bmiHeader.biWidth + j) * 3] = m_Image->B[i][j] = m_ChangeImage->B[i][j];
+			m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - i - 1) * m_BmpInfo->bmiHeader.biWidth + j) * 3 + 1] = m_Image->G[i][j] = m_ChangeImage->G[i][j];
+			m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - i - 1) * m_BmpInfo->bmiHeader.biWidth + j) * 3 + 2] = m_Image->R[i][j] = m_ChangeImage->R[i][j];
+		}
+	}
+
+	//再描画
+	Invalidate();
 }
 
 void CSampleDlg::UpdateImage() {
@@ -999,4 +1080,189 @@ void CSampleDlg::OnChangeImageFormat()
 	//		SaveImage(m_Image, filename, savePath);
 	//	}
 	//}
+}
+
+
+void CSampleDlg::OnGetImage()
+{
+	if (!videoCapture.isOpened())
+		if(!initCamera())
+			return;
+		
+	//カメラから取得
+	videoCapture.read(input);
+
+	//RGB格納
+	for (int i = 0; i < HEIGHT; i++) {
+		for (int j = 0; j < WIDTH; j++) {
+			m_ChangeImage->B[i][j] = input.ptr(i)[j * 3];
+			m_ChangeImage->G[i][j] = input.ptr(i)[j * 3 + 1];
+			m_ChangeImage->R[i][j] = input.ptr(i)[j * 3 + 2];
+		}
+	}
+
+	UpdateImage();
+}
+
+bool CSampleDlg::initCamera() {
+	//タイトルバーにファイル名を表示する
+	SetWindowText("カメラ");
+
+	// 前回の画像イメージをいったん開放
+	if (m_BmpImage) delete[] m_BmpImage;
+
+	if (m_Image) delete[] m_Image;
+	if (m_ChangeImage) delete[] m_ChangeImage;
+
+	//前回使用していれば、いったんメモリ開放する
+	if (m_BmpInfo) delete[] m_BmpInfo;
+	m_BmpInfo = (LPBITMAPINFO)new char[sizeof(BITMAPINFO)];
+
+	getBITMAPINFO();//ビットマップファイルヘッダ
+
+	getBITMAPFILEHEADER();//ビットマップインフォの設定
+
+	//画像処理用のメモリを動的に確保
+	m_Image = new Image(HEIGHT, WIDTH);
+	m_ChangeImage = new Image(HEIGHT, WIDTH);
+
+
+	//Mat型の初期化
+	input = Mat::zeros(Size(WIDTH, HEIGHT), CV_8UC3);
+
+	// カメラからのビデオキャプチャを初期化する
+	videoCapture.open(0);
+	videoCapture.set(CAP_PROP_FRAME_HEIGHT, HEIGHT);
+	videoCapture.set(CAP_PROP_FRAME_WIDTH, WIDTH);
+
+	return true;
+}
+
+
+
+void CSampleDlg::OnCameraStart()
+{
+	//initCamera();
+	m_timerID = SetTimer(1, 100, NULL);
+}
+
+void CSampleDlg::OnCameraStop()
+{
+	if (m_timerID != 0) {
+		bool error = KillTimer(m_timerID);
+		if (!error) {
+			AfxMessageBox(_T("not stop timer"));
+		}
+		m_timerID = 0;
+	}
+}
+
+
+void CSampleDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	switch (nIDEvent)
+	{
+	case 1:
+		OnGetImage();
+		OnChangeHSV();
+		break;
+	default:
+		break;
+	}
+
+	CDialog::OnTimer(nIDEvent);
+}
+
+int CSampleDlg::getBITMAPINFO() {
+	DWORD bytesPerPixel = 24 / 8; // １画素当たりのバイト数
+
+	// まず，走査線の正味のバイト数を計算する．
+	DWORD lineSizeDW = bytesPerPixel * WIDTH;
+
+	// lineSizeDW を実際のサイズ (DWORD 数) にするため，
+	// sizeof(DWORD) で割る (小数部切り上げ)．
+	lineSizeDW = (int)lineSizeDW / sizeof(DWORD);
+
+	DWORD lineSize = lineSizeDW * sizeof(DWORD);
+	DWORD imageSize = lineSize * HEIGHT;
+
+	m_BmpImage = new unsigned char[imageSize];
+
+	//ビットマップインフォの設定
+	m_BmpInfo->bmiHeader.biHeight = HEIGHT;
+	m_BmpInfo->bmiHeader.biWidth = WIDTH;
+	m_BmpInfo->bmiHeader.biBitCount = 24;
+	m_BmpInfo->bmiHeader.biSizeImage = imageSize;
+	m_BmpInfo->bmiHeader.biClrImportant = 0;
+	m_BmpInfo->bmiHeader.biClrUsed = 0;
+	m_BmpInfo->bmiHeader.biCompression = 0;
+	m_BmpInfo->bmiHeader.biPlanes = 1;
+	m_BmpInfo->bmiHeader.biSize = 40;
+	m_BmpInfo->bmiHeader.biXPelsPerMeter = 0;
+	m_BmpInfo->bmiHeader.biYPelsPerMeter = 0;
+	//
+
+	return 0;
+}
+
+int CSampleDlg::getBITMAPFILEHEADER() {
+	//ビットマップファイルヘッダの設定
+	m_BmpFileHdr.bfType = 0x4d42; /* "BM" */
+	m_BmpFileHdr.bfReserved1 = 0;
+	m_BmpFileHdr.bfReserved2 = 0;
+
+	m_BmpFileHdr.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+	m_BmpFileHdr.bfSize = m_BmpInfo->bmiHeader.biSizeImage + m_BmpFileHdr.bfOffBits;
+	//
+	return 0;
+}
+
+void CSampleDlg::OnChangeHSV()
+{
+	MyPoint maxP(0, 0);
+	MyPoint minP(m_Image->Height, m_Image->Width);
+	for (int i = 0; i < m_Image->Height; i++) {
+		for (int j = 0; j < m_Image->Width; j++) {
+			int H, S, V;
+			int R = m_Image->R[i][j];
+			int G = m_Image->G[i][j];
+			int B = m_Image->B[i][j];
+
+			int max = std::max(R, std::max(G, B));
+			int min = std::min(R, std::min(G, B));
+			if (max == R)
+				(H = (G - B) * 60) / (max - min);
+			else if (max == G)
+				(H = (B - R) * 60) / (max - min) + 120;
+			else
+				(H = (R - G) * 60) / (max - min) + 240;
+
+			S = (max - min);
+			V = max;
+			
+			if (S > 100) {
+				if (i < minP.y)
+					minP.y = i;
+				if (j < minP.x)
+					minP.x = j;
+				if (maxP.y < i)
+					maxP.y = i;
+				if (maxP.x < j)
+					maxP.x = j;
+			}
+			else {
+				//m_ChangeImage->B[i][j] = 255;
+				//m_ChangeImage->G[i][j] = 255;
+				//m_ChangeImage->R[i][j] = 255;
+			}
+		}
+	}
+
+	cutRect(minP, maxP);
+	//drawLine(MyPoint(minP.y, minP.x), MyPoint(minP.y, maxP.x));
+	//drawLine(MyPoint(minP.y, maxP.x), MyPoint(maxP.y, maxP.x));
+	//drawLine(MyPoint(maxP.y, maxP.x), MyPoint(maxP.y, minP.x));
+	//drawLine(MyPoint(maxP.y, minP.x), MyPoint(minP.y, minP.x));
+
+	UpdateImage();
 }

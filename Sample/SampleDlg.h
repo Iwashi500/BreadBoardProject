@@ -11,7 +11,7 @@
 #include <opencv2/opencv.hpp>
 #pragma once
 
-//using namespace cv;
+using namespace cv;
 
 // CSampleDlg ダイアログ
 class CSampleDlg : public CDialog
@@ -36,6 +36,9 @@ public:
 
 	CString IWI_PATH = "C:\\Users\\IWI\\Desktop\\IWI\\";
 	CString RESULT_PATH = "C:\\Users\\IWI\\Desktop\\IWI\\結果\\";
+	VideoCapture videoCapture;
+	Mat input;
+	UINT m_timerID;
 
 // ダイアログ データ
 #ifdef AFX_DESIGN_TIME
@@ -57,6 +60,10 @@ protected:
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
 	BreadBoard breadBoard;
+	const int WIDTH = 1280;
+	const int HEIGHT = 720;
+	//const int WIDTH = 1920;
+	//const int HEIGHT = 1080;
 
 public:
 	afx_msg void OnOpen();
@@ -65,6 +72,8 @@ public:
 	afx_msg void OnBack();
 	afx_msg void OnTest();
 	void UpdateImage();
+	void UpdateImage(int height, int width);
+	bool SaveImage(CString fileName);
 	bool SaveImage(Image* image, CString fileName);
 	bool SaveImage(Image* image, CString fileName, CString pathName);
 	Image* OpenImage();
@@ -76,4 +85,13 @@ public:
 	void drawBoardPoints();
 	void drawOnLine(OnLine line);
 	void drawLine(MyPoint point1, MyPoint point2);
+	void cutRect(MyPoint upLeft, MyPoint downRight);
+	afx_msg void OnGetImage();
+	int getBITMAPINFO();
+	int getBITMAPFILEHEADER();
+	bool initCamera();
+	afx_msg void OnCameraStart();
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg void OnChangeHSV();
+	afx_msg void OnCameraStop();
 };
