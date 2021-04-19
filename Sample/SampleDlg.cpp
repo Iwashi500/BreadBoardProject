@@ -81,6 +81,8 @@ CSampleDlg::CSampleDlg(CWnd* pParent /*=nullptr*/)
 	m_OrgImage = NULL;
 	m_OrgBmpFileHdr = {};
 	m_OrgBmpInfo = NULL;
+	m_ChangeImage = NULL;
+	m_BaseImage = NULL;
 
 	//LocalConfigクラスの作成が必要(Local設定ファイルのため.gitignore)
 	IWI_PATH = LocalConfig::saveBasePath();
@@ -100,6 +102,9 @@ CSampleDlg::~CSampleDlg()
 	}
 	if (m_ChangeImage) {
 		delete[] m_ChangeImage;
+	}
+	if (m_BaseImage) {
+		delete[] m_BaseImage;
 	}
 
 	if (m_OrgImage)
@@ -130,6 +135,9 @@ BEGIN_MESSAGE_MAP(CSampleDlg, CDialog)
 	ON_WM_TIMER()
 	ON_BN_CLICKED(IDC_BUTTON9, &CSampleDlg::OnChangeHSV)
 	ON_BN_CLICKED(IDC_BUTTON10, &CSampleDlg::OnCameraStop)
+	ON_BN_CLICKED(IDC_BUTTON11, &CSampleDlg::OnBaseDiff)
+	ON_BN_CLICKED(IDC_BUTTON12, &CSampleDlg::OnSaveBaseBoard)
+	ON_BN_CLICKED(IDC_BUTTON13, &CSampleDlg::OnOpening)
 END_MESSAGE_MAP()
 
 
@@ -700,7 +708,7 @@ void CSampleDlg::drawLine(MyPoint point1, MyPoint point2) {
 void CSampleDlg::cutRect(MyPoint upLeft, MyPoint downRight) {
 	for (int i = 0; i < m_Image->Height; i++) {
 			for (int j = 0; j < m_Image->Width; j++) {
-				if (upLeft.x < j && j < downRight.x 
+				if (upLeft.x < j && j < downRight.x
 					&& upLeft.y < i && i < downRight.y){
 				}
 				else {
@@ -744,22 +752,22 @@ void CSampleDlg::UpdateImage() {
 }
 
 //半分ブラックボックス
-Image* CSampleDlg::OpenImage() {
+Image* CSampleDlg::OpenImage(CString fileName) {
 	int i, j;
 	size_t image_size;
-	CString filename;
+	//CString filename;
 	CFile file;
 	BITMAPINFOHEADER myBmpInfoHdr;
 	unsigned char* bmpImage;
 	LPBITMAPINFO bmpInfo;
 	Image* image = new Image(0, 0);
 	BITMAPFILEHEADER bmpFileHdr;
-	CFileDialog myDLG(TRUE, NULL, NULL, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-		"ﾋﾞｯﾄﾏｯﾌﾟ(*.BMP)|*.BMP||");
-	if (myDLG.DoModal() != IDOK)return image;
+	//CFileDialog myDLG(TRUE, NULL, NULL, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
+	//	"ﾋﾞｯﾄﾏｯﾌﾟ(*.BMP)|*.BMP||");
+	//if (myDLG.DoModal() != IDOK)return image;
 
-	filename = myDLG.GetPathName();
-	if (!file.Open(filename, CFile::modeRead | CFile::typeBinary)) {
+	//filename = myDLG.GetPathName();
+	if (!file.Open(fileName, CFile::modeRead | CFile::typeBinary)) {
 		return image;
 	}
 	file.Read(&bmpFileHdr, sizeof(BITMAPFILEHEADER));
@@ -1113,6 +1121,7 @@ bool CSampleDlg::initCamera() {
 
 	if (m_Image) delete[] m_Image;
 	if (m_ChangeImage) delete[] m_ChangeImage;
+	if (m_BaseImage) delete[] m_BaseImage;
 
 	//前回使用していれば、いったんメモリ開放する
 	if (m_BmpInfo) delete[] m_BmpInfo;
@@ -1134,6 +1143,9 @@ bool CSampleDlg::initCamera() {
 	videoCapture.open(0);
 	videoCapture.set(CAP_PROP_FRAME_HEIGHT, HEIGHT);
 	videoCapture.set(CAP_PROP_FRAME_WIDTH, WIDTH);
+
+	CString basePath = IWI_PATH + "BaseBoard.bmp";
+	m_BaseImage = OpenImage(basePath);
 
 	return true;
 }
@@ -1164,7 +1176,8 @@ void CSampleDlg::OnTimer(UINT_PTR nIDEvent)
 	{
 	case 1:
 		OnGetImage();
-		OnChangeHSV();
+		//OnChangeHSV();
+		baseDiff();
 		break;
 	default:
 		break;
@@ -1230,15 +1243,15 @@ void CSampleDlg::OnChangeHSV()
 
 			int max = std::max(R, std::max(G, B));
 			int min = std::min(R, std::min(G, B));
-			if (max == R)
-				(H = (G - B) * 60) / (max - min);
-			else if (max == G)
-				(H = (B - R) * 60) / (max - min) + 120;
-			else
-				(H = (R - G) * 60) / (max - min) + 240;
+			//if (max == R)
+			//	(H = (G - B) * 60) / (max - min);
+			//else if (max == G)
+			//	(H = (B - R) * 60) / (max - min) + 120;
+			//else
+			//	(H = (R - G) * 60) / (max - min) + 240;
 
 			S = (max - min);
-			V = max;
+			//V = max;
 			
 			if (S > 100) {
 				if (i < minP.y)
@@ -1251,10 +1264,11 @@ void CSampleDlg::OnChangeHSV()
 					maxP.x = j;
 			}
 			else {
-				//m_ChangeImage->B[i][j] = 255;
-				//m_ChangeImage->G[i][j] = 255;
-				//m_ChangeImage->R[i][j] = 255;
 			}
+
+			//m_ChangeImage->B[i][j] = S;
+			//m_ChangeImage->G[i][j] = S;
+			//m_ChangeImage->R[i][j] = S;
 		}
 	}
 
@@ -1265,4 +1279,136 @@ void CSampleDlg::OnChangeHSV()
 	//drawLine(MyPoint(maxP.y, minP.x), MyPoint(minP.y, minP.x));
 
 	UpdateImage();
+}
+
+void CSampleDlg::OnBaseDiff()
+{
+	OnGetImage();
+	baseDiff();
+	UpdateImage();
+}
+
+void CSampleDlg::baseDiff() {
+	for (int i = 0; i < m_Image->Height; i++) {
+		for (int j = 0; j < m_Image->Width; j++) {
+			float kido = std::roundf(0.3 * m_Image->R[i][j] + 0.59 * m_Image->G[i][j] + 0.11 * m_Image->B[i][j]);
+			float baseKido = std::roundf(0.3 * m_BaseImage->R[i][j] + 0.59 * m_BaseImage->G[i][j] + 0.11 * m_BaseImage->B[i][j]);
+			float diff = std::abs(kido - baseKido);
+
+			if (diff < 50) {
+				m_ChangeImage->B[i][j] = 0;
+				m_ChangeImage->G[i][j] = 0;
+				m_ChangeImage->R[i][j] = 0;
+			}
+		}
+	}
+}
+
+void CSampleDlg::OnSaveBaseBoard()
+{
+	OnGetImage();
+	SaveImage(IWI_PATH + "BaseBoard");
+}
+
+void CSampleDlg::expansion(Image* image, int count) {
+
+	for (int c = 0; c < count; c++) {
+		for (int i = 0; i < m_Image->Height; i++) {
+			for (int j = 0; j < m_Image->Width; j++) {
+				if (m_Image->B[i][j] == 0
+					&& m_Image->G[i][j] == 0
+					&& m_Image->R[i][j] == 0) {
+					int up = i - 1;
+					if (up < 0) up = 0;
+					int down = i + 1;
+					if (down >= m_Image->Height) down = i;
+					int right = j - 1;
+					if (right < 0) right = 0;
+					int left = j + 1;
+					if (left >= m_Image->Width) left = j;
+
+					if (m_Image->B[up][j] != 0
+						|| m_Image->G[up][j] != 0
+						|| m_Image->R[up][j] != 0
+						|| m_Image->B[down][j] != 0
+						|| m_Image->G[down][j] != 0
+						|| m_Image->R[down][j] != 0
+						|| m_Image->B[i][right] != 0
+						|| m_Image->G[i][right] != 0
+						|| m_Image->R[i][right] != 0
+						|| m_Image->B[i][left] != 0
+						|| m_Image->G[i][left] != 0
+						|| m_Image->R[i][left] != 0) {
+						m_ChangeImage->B[i][j] = image->B[i][j];
+						m_ChangeImage->G[i][j] = image->G[i][j];
+						m_ChangeImage->R[i][j] = image->R[i][j];
+					}
+				}
+			}
+		}
+		UpdateImage();
+	}
+}
+
+void CSampleDlg::contraction(int count) {
+
+	for (int c = 0; c < count; c++) {
+		for (int i = 0; i < m_Image->Height; i++) {
+			for (int j = 0; j < m_Image->Width; j++) {
+				if (m_Image->B[i][j] != 0
+					&& m_Image->G[i][j] != 0
+					&& m_Image->R[i][j] != 0) {
+					int up = i - 1;
+					if (up < 0) up = 0;
+					int down = i + 1;
+					if (down >= m_Image->Height) down = i;
+					int right = j - 1;
+					if (right < 0) right = 0;
+					int left = j + 1;
+					if (left >= m_Image->Width) left = j;
+
+					if (
+						(m_Image->B[up][j] == 0
+							&& m_Image->G[up][j] == 0
+							&& m_Image->R[up][j] == 0)
+						|| (m_Image->B[down][j] == 0
+							&& m_Image->G[down][j] == 0
+							&& m_Image->R[down][j] == 0)
+						|| (m_Image->B[i][right] == 0
+							&& m_Image->G[i][right] == 0
+							&& m_Image->R[i][right] == 0)
+						|| (m_Image->B[i][left] == 0
+							&& m_Image->G[i][left] == 0
+							&& m_Image->R[i][left] == 0)) {
+						m_ChangeImage->B[i][j] = 0;
+						m_ChangeImage->G[i][j] = 0;
+						m_ChangeImage->R[i][j] = 0;
+					}
+				}
+			}
+		}
+
+		UpdateImage();
+	}
+}
+
+
+void CSampleDlg::OnOpening()
+{
+	int count = 3;
+	Image* image = new Image(m_Image->Height, m_Image->Width);
+	for (int i = 0; i < m_Image->Height; i++) {
+		for (int j = 0; j < m_Image->Width; j++) {
+			image->B[i][j] = m_Image->B[i][j];
+			image->G[i][j] = m_Image->G[i][j];
+			image->R[i][j] = m_Image->R[i][j];
+			image->R[i][j] = m_Image->R[i][j];
+		}
+	}
+
+	contraction(3);
+	SaveImage(RESULT_PATH + "contraction");
+
+	expansion(image, count);
+	SaveImage(RESULT_PATH + "expansion");
 }

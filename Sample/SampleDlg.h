@@ -28,6 +28,7 @@ public:
 	BITMAPFILEHEADER m_BmpFileHdr; //BMPファイル情報を格納する変数
 	Image* m_Image; //画像データを格納する変数
 	Image* m_ChangeImage; //変更用の画像データ
+	Image* m_BaseImage; //背景差分の比較元画像
 	unsigned char *m_OrgImage;
 	BITMAPFILEHEADER m_OrgBmpFileHdr;
 	LPBITMAPINFO m_OrgBmpInfo;
@@ -76,7 +77,7 @@ public:
 	bool SaveImage(CString fileName);
 	bool SaveImage(Image* image, CString fileName);
 	bool SaveImage(Image* image, CString fileName, CString pathName);
-	Image* OpenImage();
+	Image* OpenImage(CString fileName);
 	afx_msg void OnKido();
 	afx_msg void OnEdgeSearch();
 	bool checkInnerImage(int y, int x);
@@ -94,4 +95,10 @@ public:
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnChangeHSV();
 	afx_msg void OnCameraStop();
+	afx_msg void OnBaseDiff();
+	afx_msg void OnSaveBaseBoard();
+	void baseDiff();
+	void expansion(Image* image, int count);
+	void contraction(int count);
+	afx_msg void OnOpening();
 };

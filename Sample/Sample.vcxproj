@@ -231,6 +231,7 @@
     <None Include="res\Sample.rc2" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="..\..\..\..\..\Desktop\IWI\ブレッドボード.bmp" />
     <Image Include="res\Sample.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
