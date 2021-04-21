@@ -15,12 +15,10 @@
 #include <algorithm>
 #include <list>
 #include "LocalConfig.h"
-//#include "Vector.h"
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/imgproc/types_c.h>
 
-//#include <opencv2/opencv.hpp>
 #define _USE_MATH_DEFINES
 #include <math.h>
 
@@ -138,6 +136,7 @@ BEGIN_MESSAGE_MAP(CSampleDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON11, &CSampleDlg::OnBaseDiff)
 	ON_BN_CLICKED(IDC_BUTTON12, &CSampleDlg::OnSaveBaseBoard)
 	ON_BN_CLICKED(IDC_BUTTON13, &CSampleDlg::OnOpening)
+	ON_BN_CLICKED(IDC_BUTTON14, &CSampleDlg::OnClosing)
 END_MESSAGE_MAP()
 
 
@@ -309,14 +308,10 @@ void CSampleDlg::OnOpen()
 	m_Image = new Image(m_BmpInfo->bmiHeader.biHeight, m_BmpInfo->bmiHeader.biWidth);
 	m_ChangeImage = new Image(m_BmpInfo->bmiHeader.biHeight, m_BmpInfo->bmiHeader.biWidth);
 
-	int debug = 0;
 	//RGBに分けて格納する
 	if (myBmpInfoHdr.biBitCount == 24) {//フルカラーの場合
 		for (i = 0; i < m_BmpInfo->bmiHeader.biHeight; i++) {
 			for (j = 0; j < m_BmpInfo->bmiHeader.biWidth; j++) {
-				if (j == 639)
-					debug++;
-
 				m_Image->B[i][j] = m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - 1 - i) * m_BmpInfo->bmiHeader.biWidth + j) * 3];
 				m_Image->G[i][j] = m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - 1 - i) * m_BmpInfo->bmiHeader.biWidth + j) * 3 + 1];
 				m_Image->R[i][j] = m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - 1 - i) * m_BmpInfo->bmiHeader.biWidth + j) * 3 + 2];
@@ -342,6 +337,101 @@ void CSampleDlg::OnOpen()
 	//-----------------------------------------------再描画指示
 
 	//再描画支持
+	Invalidate();
+}
+
+void CSampleDlg::showImage(Image* image) {
+	CString filePath = "./";
+	CString name = "test";
+	CString fileName = filePath + name + ".bmp";
+	SaveImage(image, "test", "./");
+
+	int i, j;
+	size_t image_size;
+	CFile file;
+	BITMAPINFOHEADER myBmpInfoHdr;
+
+	//----------------------------ファイル操作ダイアログの呼び出し処理
+	//取得したファイルをオープンする
+	if (!file.Open(fileName, CFile::modeRead | CFile::typeBinary)) {
+		return;
+	}
+
+	//----------------------------------------------ファイル内容の読み込み処理
+
+	//ファイルヘッダ部とインフォヘッダ部を読み込む
+	file.Read(&m_BmpFileHdr, sizeof(BITMAPFILEHEADER));
+	file.Read(&myBmpInfoHdr, sizeof(BITMAPINFOHEADER));
+
+	//前回の画像イメージをいったん解放
+	if (m_BmpImage)delete[] m_BmpImage;
+
+	//前回使用していれば、いったんメモリ解放する
+	if (m_BmpInfo)delete[] m_BmpInfo;
+
+	//前回の画像処理メモリをいったん解放
+	if (m_Image)delete[] m_Image;
+
+	if (m_OrgImage)delete[] m_OrgImage;
+
+	//色情報を取得する
+	//biBitCountは1ピクセルあたりのカラー表現ビット数
+	//1,4,8,16,32がある。数字が大きいほど精細表現が可能
+	//16ビット以上と未満でカラーデータ格納が異なる
+	if (myBmpInfoHdr.biBitCount >= 16) {
+		m_BmpInfo = (LPBITMAPINFO)new char[sizeof(BITMAPINFO)];
+	}
+	else {
+		m_BmpInfo = (LPBITMAPINFO)new char[sizeof(BITMAPINFOHEADER) +
+			(1i64 << myBmpInfoHdr.biBitCount) * sizeof(RGBQUAD)];
+		file.Read(m_BmpInfo->bmiColors,
+			1i64 << (myBmpInfoHdr.biBitCount) * sizeof(RGBQUAD));
+	}
+
+	//m_BmpInfo(LPBITMAPINFO型)のmyBmpInfoHdrメンバに設定
+	m_BmpInfo->bmiHeader = myBmpInfoHdr;
+
+	//ファイル内のビットマップ実データ位置に合わせる
+	file.Seek(m_BmpFileHdr.bfOffBits, CFile::begin);
+
+	//実データ分のバイト数を確保
+	//bfsize	:ビットマップファイル全サイズ
+	//bfffBits	:先頭にあるヘッダ情報サイズ
+	image_size = m_BmpFileHdr.bfSize - m_BmpFileHdr.bfOffBits;
+	m_BmpImage = new unsigned char[image_size];
+
+	//ビットマップ実データを読み込み格納
+	file.Read(m_BmpImage, (UINT)image_size);
+	file.Close();
+
+	m_Image = new Image(m_BmpInfo->bmiHeader.biHeight, m_BmpInfo->bmiHeader.biWidth);
+	m_ChangeImage = new Image(m_BmpInfo->bmiHeader.biHeight, m_BmpInfo->bmiHeader.biWidth);
+
+	//RGBに分けて格納する
+	if (myBmpInfoHdr.biBitCount == 24) {//フルカラーの場合
+		for (i = 0; i < m_BmpInfo->bmiHeader.biHeight; i++) {
+			for (j = 0; j < m_BmpInfo->bmiHeader.biWidth; j++) {
+				m_Image->B[i][j] = m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - 1 - i) * m_BmpInfo->bmiHeader.biWidth + j) * 3];
+				m_Image->G[i][j] = m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - 1 - i) * m_BmpInfo->bmiHeader.biWidth + j) * 3 + 1];
+				m_Image->R[i][j] = m_BmpImage[((m_BmpInfo->bmiHeader.biHeight - 1 - i) * m_BmpInfo->bmiHeader.biWidth + j) * 3 + 2];
+				m_ChangeImage->B[i][j] = m_Image->B[i][j];
+				m_ChangeImage->G[i][j] = m_Image->G[i][j];
+				m_ChangeImage->R[i][j] = m_Image->R[i][j];
+			}
+		}
+	}
+	else {
+	}
+
+	//-----------------------------------------------戻る用にコピー
+	//メモリの確保
+	m_OrgImage = new unsigned char[image_size];
+	//メモリのコピー
+	memcpy(m_OrgImage, m_BmpImage, image_size);
+	//ファイルヘッダ、インフォの保存
+	m_OrgBmpFileHdr = m_BmpFileHdr;
+	m_OrgBmpInfo = m_BmpInfo;
+
 	Invalidate();
 }
 
@@ -428,7 +518,7 @@ void CSampleDlg::OnSave()
 }
 
 bool CSampleDlg::SaveImage(Image* image, CString fileName) {
-	return SaveImage(image, fileName, IWI_PATH);
+	return SaveImage(image, fileName, RESULT_PATH);
 }
 
 //m_Image保存で固定
@@ -570,7 +660,7 @@ void CSampleDlg::drawBoardPoints() {
 			int y = base.y + add.y * i;
 			int x = base.x + add.x * j;
 			MyPoint point(y, x);
-			drawPoint(point, 3);
+			m_Image->drawPoint(point, 3);
 			chain.pushNext(point);
 			onLine.push(chain);
 		}
@@ -585,7 +675,7 @@ void CSampleDlg::drawBoardPoints() {
 			int y = base.y + add.y * i;
 			int x = base.x + add.x * j;
 			MyPoint point(y, x);
-			drawPoint(point, 3);
+			m_Image->drawPoint(point, 3);
 			chain.pushNext(point);
 			onLine.push(chain);
 		}
@@ -620,108 +710,124 @@ void CSampleDlg::drawBoardPoints() {
 
 void CSampleDlg::OnTest()
 {	
-	if (m_fileName == "" && videoCapture.isOpened())
-		m_fileName = "camera";
+	OnGetImage();
+	cutImageUseHSV(m_BaseImage);
 
-	CString fileName = "";
-	int fileIndex = 0;
-	fileName.Format(RESULT_PATH + m_fileName + "_%d", ++fileIndex);
-	SaveImage(fileName);
+	MyPoint startPoint;
+	MyPoint endPoint;
+	bool start = false;
+	
+	for (int i = 0; i < m_BaseImage->Height; i++) {
+		for (int j = 0; j < m_BaseImage->Width; j++) {
+			if (!m_BaseImage->checkWhite(i, j)) {
+				if (!start) {
+					startPoint = MyPoint(i, j);
+					start = true;
+				}
+				endPoint = MyPoint(i, j);
+			}
+		}
+	}
 
-	fileName.Format("%s%s_%d_hsv", RESULT_PATH, m_fileName, ++fileIndex);
-	OnChangeHSV();
-	SaveImage(fileName);
+	int x = endPoint.x - startPoint.x;
+	int y = endPoint.y - startPoint.y;
+	Image* baseCut = new Image(y, x);
+	for (int i = 0; i < y; i++) {
+		for (int j = 0; j < x; j++) {
+			baseCut->B[i][j] = m_BaseImage->B[startPoint.y + i][startPoint.x + j];
+			baseCut->G[i][j] = m_BaseImage->G[startPoint.y + i][startPoint.x + j];
+			baseCut->R[i][j] = m_BaseImage->R[startPoint.y + i][startPoint.x + j];
+		}
+	}
 
-	//drawBoardPoints();
-	//fileName.Format(fileName + "_%d_lines", ++fileIndex);
-	//SaveImage(m_Image, fileName, RESULT_PATH);
+	/*cutImageUseHSV(m_Image);
+	start = false;
+	for (int i = 0; i < m_Image->Height; i++) {
+		for (int j = 0; j < m_Image->Width; j++) {
+			if (!m_Image->checkWhite(i, j)) {
+				if (!start) {
+					startPoint = MyPoint(i, j);
+					start = true;
+				}
+				endPoint = MyPoint(i, j);
+			}
+		}
+	}*/
+
+	startPoint = MyPoint(49, 265);
+	endPoint = MyPoint(579, 1016);
+
+	x = endPoint.x - startPoint.x;
+	y = endPoint.y - startPoint.y;
+	Image* camCut = new Image(y, x);
+	Image* image = new Image(y, x);
+	for (int i = 0; i < y; i++) {
+		for (int j = 0; j < x; j++) {
+			image->B[i][j] = m_Image->B[startPoint.y + i][startPoint.x + j];
+			image->G[i][j] = m_Image->G[startPoint.y + i][startPoint.x + j];
+			image->R[i][j] = m_Image->R[startPoint.y + i][startPoint.x + j];
+			
+			camCut->B[i][j] = m_Image->B[startPoint.y + i][startPoint.x + j];
+			camCut->G[i][j] = m_Image->G[startPoint.y + i][startPoint.x + j];
+			camCut->R[i][j] = m_Image->R[startPoint.y + i][startPoint.x + j];
+		}
+	}
+
+	Image* diffCut = camCut->copy();
+	for (int i = 0; i < diffCut->Height; i++) {
+		if (i >= baseCut->Height)
+			break;
+
+		for (int j = 0; j < diffCut->Width; j++) {
+			if (j >= baseCut->Width)
+				break;
+
+			float camKido = std::roundf(0.3 * camCut->R[i][j] + 0.59 * camCut->G[i][j] + 0.11 * camCut->B[i][j]);
+			float baseKido = std::roundf(0.3 * baseCut->R[i][j] + 0.59 * baseCut->G[i][j] + 0.11 * baseCut->B[i][j]);
+			float diff = std::abs(camKido - baseKido);
+
+			if (diff < 40) {
+				diffCut->B[i][j] = 0;
+				diffCut->G[i][j] = 0;
+				diffCut->R[i][j] = 0;
+			}
+		}
+	}
+
+	SaveImage(m_Image, "input");
+	SaveImage(baseCut, "baseCut");
+	SaveImage(camCut, "camCut");
+	SaveImage(diffCut, "diffCut");
+
+	showImage(diffCut);
+
+	int count = 1;
+	int count2 = 4;
+	m_ChangeImage->contraction(count);
+	UpdateImage();
+	m_ChangeImage->expansion(image, count);
+	UpdateImage();
+
+	SaveImage(m_Image, "opening");
+
+	m_ChangeImage->expansion(image, count2);
+	UpdateImage();
+	m_ChangeImage->contraction(count2 - 1);
+	UpdateImage();
+
+	SaveImage(m_Image, "closing");
+
+	delete[] diffCut;
+	delete[] baseCut;
+	delete[] camCut;
+	delete[] image;
 }
 
 void CSampleDlg::drawOnLine(OnLine line) {
 	for (ChainPoint chain : line.getChains()) {
-		drawLine(chain.point1, chain.point2);
+		m_Image->drawLine(chain.point1, chain.point2);
 	}
 }
-
-void CSampleDlg::drawLine(MyPoint point1, MyPoint point2) {
-	if (point1 == point2)
-		return;
-	int startY;
-	int startX;
-	int endY;
-	int endX;
-	float angle = 0;
-
-	if (point1.x == point2.x) {
-		angle = M_PI_2;
-		if (point1.y < point2.y) {
-			startY = point1.y;
-			startX = point1.x;
-			endY = point2.y;
-			endX = point2.x;
-		}
-		else {
-			startY = point2.y;
-			startX = point2.x;
-			endY = point1.y;
-			endX = point1.x;
-		}
-	}
-	else {
-		if (point1.x < point2.x) {
-			startY = point1.y;
-			startX = point1.x;
-			endY = point2.y;
-			endX = point2.x;
-		}
-		else {
-			startY = point2.y;
-			startX = point2.x;
-			endY = point1.y;
-			endX = point1.x;
-		}
-		float dy = startY - endY;
-		float dx = startX - endX;
-		angle = std::atanf(dy / dx);
-	}
-
-	float y = startY;
-	float x = startX;
-
-	while (1) {
-		if (0 < y && y < m_Image->Height
-			&& 0 < x && x < m_Image->Width) {
-			m_ChangeImage->B[(int)y][(int)x] = 0;
-			m_ChangeImage->G[(int)y][(int)x] = 255;
-			m_ChangeImage->R[(int)y][(int)x] = 255;
-		}
-		x += cosf(angle);
-		y += sinf(angle);
-
-		if (x < 0 || x >= m_Image->Width || y < 0 || y >= m_Image->Height)
-			break;
-		else if ((std::fabsf(x - endX) < 1) && (std::fabsf(y - endY) < 1))
-			break;
-	}
-}
-
-void CSampleDlg::cutRect(MyPoint upLeft, MyPoint downRight) {
-	for (int i = 0; i < m_Image->Height; i++) {
-			for (int j = 0; j < m_Image->Width; j++) {
-				if (upLeft.x < j && j < downRight.x
-					&& upLeft.y < i && i < downRight.y){
-				}
-				else {
-					m_ChangeImage->B[i][j] = 255;
-					m_ChangeImage->G[i][j] = 255;
-					m_ChangeImage->R[i][j] = 255;
-				}
-			}
-		
-	}
-}
-
-
 
 void CSampleDlg::UpdateImage(int height, int width) {
 	//表示用
@@ -866,29 +972,6 @@ void CSampleDlg::OnEdgeSearch()
 	//再描画
 	Invalidate();
 }
-
-bool CSampleDlg:: checkInnerImage(int y, int x) {
-	return (0 <= y
-		&& y < m_Image->Height
-		&& 0 <= x
-		&& x < m_Image->Width);
-}
-
-void CSampleDlg::drawPoint(MyPoint point, int size) {
-	
-	int radius = size / 2;
-
-	for (int i = point.y - radius; i <= point.y + radius; i++) {
-		for (int j = point.x - radius; j <= point.x + radius; j++) {
-			if (checkInnerImage(i, j)) {
-				m_ChangeImage->B[i][j] = 0;
-				m_ChangeImage->G[i][j] = 0;
-				m_ChangeImage->R[i][j] = 255;
-			}
-		}
-	}
-}
-
 
 void CSampleDlg::OnChangeImageFormat()
 {
@@ -1090,7 +1173,6 @@ void CSampleDlg::OnChangeImageFormat()
 	//}
 }
 
-
 void CSampleDlg::OnGetImage()
 {
 	if (!videoCapture.isOpened())
@@ -1232,14 +1314,19 @@ int CSampleDlg::getBITMAPFILEHEADER() {
 
 void CSampleDlg::OnChangeHSV()
 {
+	cutImageUseHSV(m_Image);
+	UpdateImage();
+}
+
+void CSampleDlg::cutImageUseHSV(Image* image) {
 	MyPoint maxP(0, 0);
-	MyPoint minP(m_Image->Height, m_Image->Width);
-	for (int i = 0; i < m_Image->Height; i++) {
-		for (int j = 0; j < m_Image->Width; j++) {
+	MyPoint minP(image->Height, image->Width);
+	for (int i = 0; i < image->Height; i++) {
+		for (int j = 0; j < image->Width; j++) {
 			int H, S, V;
-			int R = m_Image->R[i][j];
-			int G = m_Image->G[i][j];
-			int B = m_Image->B[i][j];
+			int R = image->R[i][j];
+			int G = image->G[i][j];
+			int B = image->B[i][j];
 
 			int max = std::max(R, std::max(G, B));
 			int min = std::min(R, std::min(G, B));
@@ -1252,7 +1339,7 @@ void CSampleDlg::OnChangeHSV()
 
 			S = (max - min);
 			//V = max;
-			
+
 			if (S > 100) {
 				if (i < minP.y)
 					minP.y = i;
@@ -1272,13 +1359,7 @@ void CSampleDlg::OnChangeHSV()
 		}
 	}
 
-	cutRect(minP, maxP);
-	//drawLine(MyPoint(minP.y, minP.x), MyPoint(minP.y, maxP.x));
-	//drawLine(MyPoint(minP.y, maxP.x), MyPoint(maxP.y, maxP.x));
-	//drawLine(MyPoint(maxP.y, maxP.x), MyPoint(maxP.y, minP.x));
-	//drawLine(MyPoint(maxP.y, minP.x), MyPoint(minP.y, minP.x));
-
-	UpdateImage();
+	image->cutRect(minP, maxP);
 }
 
 void CSampleDlg::OnBaseDiff()
@@ -1302,6 +1383,8 @@ void CSampleDlg::baseDiff() {
 			}
 		}
 	}
+
+	UpdateImage();
 }
 
 void CSampleDlg::OnSaveBaseBoard()
@@ -1310,105 +1393,29 @@ void CSampleDlg::OnSaveBaseBoard()
 	SaveImage(IWI_PATH + "BaseBoard");
 }
 
-void CSampleDlg::expansion(Image* image, int count) {
-
-	for (int c = 0; c < count; c++) {
-		for (int i = 0; i < m_Image->Height; i++) {
-			for (int j = 0; j < m_Image->Width; j++) {
-				if (m_Image->B[i][j] == 0
-					&& m_Image->G[i][j] == 0
-					&& m_Image->R[i][j] == 0) {
-					int up = i - 1;
-					if (up < 0) up = 0;
-					int down = i + 1;
-					if (down >= m_Image->Height) down = i;
-					int right = j - 1;
-					if (right < 0) right = 0;
-					int left = j + 1;
-					if (left >= m_Image->Width) left = j;
-
-					if (m_Image->B[up][j] != 0
-						|| m_Image->G[up][j] != 0
-						|| m_Image->R[up][j] != 0
-						|| m_Image->B[down][j] != 0
-						|| m_Image->G[down][j] != 0
-						|| m_Image->R[down][j] != 0
-						|| m_Image->B[i][right] != 0
-						|| m_Image->G[i][right] != 0
-						|| m_Image->R[i][right] != 0
-						|| m_Image->B[i][left] != 0
-						|| m_Image->G[i][left] != 0
-						|| m_Image->R[i][left] != 0) {
-						m_ChangeImage->B[i][j] = image->B[i][j];
-						m_ChangeImage->G[i][j] = image->G[i][j];
-						m_ChangeImage->R[i][j] = image->R[i][j];
-					}
-				}
-			}
-		}
-		UpdateImage();
-	}
-}
-
-void CSampleDlg::contraction(int count) {
-
-	for (int c = 0; c < count; c++) {
-		for (int i = 0; i < m_Image->Height; i++) {
-			for (int j = 0; j < m_Image->Width; j++) {
-				if (m_Image->B[i][j] != 0
-					&& m_Image->G[i][j] != 0
-					&& m_Image->R[i][j] != 0) {
-					int up = i - 1;
-					if (up < 0) up = 0;
-					int down = i + 1;
-					if (down >= m_Image->Height) down = i;
-					int right = j - 1;
-					if (right < 0) right = 0;
-					int left = j + 1;
-					if (left >= m_Image->Width) left = j;
-
-					if (
-						(m_Image->B[up][j] == 0
-							&& m_Image->G[up][j] == 0
-							&& m_Image->R[up][j] == 0)
-						|| (m_Image->B[down][j] == 0
-							&& m_Image->G[down][j] == 0
-							&& m_Image->R[down][j] == 0)
-						|| (m_Image->B[i][right] == 0
-							&& m_Image->G[i][right] == 0
-							&& m_Image->R[i][right] == 0)
-						|| (m_Image->B[i][left] == 0
-							&& m_Image->G[i][left] == 0
-							&& m_Image->R[i][left] == 0)) {
-						m_ChangeImage->B[i][j] = 0;
-						m_ChangeImage->G[i][j] = 0;
-						m_ChangeImage->R[i][j] = 0;
-					}
-				}
-			}
-		}
-
-		UpdateImage();
-	}
-}
-
-
 void CSampleDlg::OnOpening()
 {
-	int count = 3;
-	Image* image = new Image(m_Image->Height, m_Image->Width);
-	for (int i = 0; i < m_Image->Height; i++) {
-		for (int j = 0; j < m_Image->Width; j++) {
-			image->B[i][j] = m_Image->B[i][j];
-			image->G[i][j] = m_Image->G[i][j];
-			image->R[i][j] = m_Image->R[i][j];
-			image->R[i][j] = m_Image->R[i][j];
-		}
-	}
+	int count = 1;
+	Image* image = m_Image->copy();
 
-	contraction(3);
-	SaveImage(RESULT_PATH + "contraction");
+	m_ChangeImage->contraction(count);
+	UpdateImage();
+	m_ChangeImage->expansion(image, count);
+	UpdateImage();
 
-	expansion(image, count);
-	SaveImage(RESULT_PATH + "expansion");
+	delete[] image;
+}
+
+
+void CSampleDlg::OnClosing()
+{
+	int count = 1;
+	Image* image = m_Image->copy();
+
+	m_ChangeImage->expansion(image, count);
+	UpdateImage();
+	m_ChangeImage->contraction(count);
+	UpdateImage();
+
+	delete[] image;
 }

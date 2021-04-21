@@ -80,13 +80,9 @@ public:
 	Image* OpenImage(CString fileName);
 	afx_msg void OnKido();
 	afx_msg void OnEdgeSearch();
-	bool checkInnerImage(int y, int x);
 	afx_msg void OnChangeImageFormat();
-	void drawPoint(MyPoint point, int size);
 	void drawBoardPoints();
 	void drawOnLine(OnLine line);
-	void drawLine(MyPoint point1, MyPoint point2);
-	void cutRect(MyPoint upLeft, MyPoint downRight);
 	afx_msg void OnGetImage();
 	int getBITMAPINFO();
 	int getBITMAPFILEHEADER();
@@ -94,11 +90,12 @@ public:
 	afx_msg void OnCameraStart();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnChangeHSV();
+	void cutImageUseHSV(Image* image);
 	afx_msg void OnCameraStop();
 	afx_msg void OnBaseDiff();
 	afx_msg void OnSaveBaseBoard();
 	void baseDiff();
-	void expansion(Image* image, int count);
-	void contraction(int count);
 	afx_msg void OnOpening();
+	void showImage(Image* image);
+	afx_msg void OnClosing();
 };
