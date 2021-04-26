@@ -710,117 +710,35 @@ void CSampleDlg::drawBoardPoints() {
 
 void CSampleDlg::OnTest()
 {	
-	OnGetImage();
-	cutImageUseHSV(m_BaseImage);
+	if (!videoCapture.isOpened())
+		if (!initCamera())
+			return;
 
-	MyPoint startPoint;
-	MyPoint endPoint;
-	bool start = false;
-	
-	for (int i = 0; i < m_BaseImage->Height; i++) {
-		for (int j = 0; j < m_BaseImage->Width; j++) {
-			if (!m_BaseImage->checkWhite(i, j)) {
-				if (!start) {
-					startPoint = MyPoint(i, j);
-					start = true;
-				}
-				endPoint = MyPoint(i, j);
-			}
-		}
+	videoCapture.read(input);
+
+	Mat output, msk, result, edge;
+	std::vector<cv::Vec4i> lines;
+
+	Canny(input, edge, 50, 100, 3);
+
+	HoughLinesP(edge, lines, 1, CV_PI / 180.0, 150, 100, 10);
+
+	//result = Mat::zeros(input.rows, input.cols, CV_8UC3);
+	//int fromTo[] = { 0,2,0,1,0,0 };
+	////チャンネル数?を増やしてコピー
+	//cv::mixChannels(&input, 1, &result, 1, fromTo, 3);
+	input.copyTo(result);
+
+	for (auto line : lines) {
+		cv::line(result, cv::Point(line[0], line[1]), cv::Point(line[2], line[3]), cv::Scalar(0, 0, 255), 1);//線の色と太さを指定(B,G,R,太さ)
 	}
 
-	int x = endPoint.x - startPoint.x;
-	int y = endPoint.y - startPoint.y;
-	Image* baseCut = new Image(y, x);
-	for (int i = 0; i < y; i++) {
-		for (int j = 0; j < x; j++) {
-			baseCut->B[i][j] = m_BaseImage->B[startPoint.y + i][startPoint.x + j];
-			baseCut->G[i][j] = m_BaseImage->G[startPoint.y + i][startPoint.x + j];
-			baseCut->R[i][j] = m_BaseImage->R[startPoint.y + i][startPoint.x + j];
-		}
-	}
+	imshow("", result);
 
-	/*cutImageUseHSV(m_Image);
-	start = false;
-	for (int i = 0; i < m_Image->Height; i++) {
-		for (int j = 0; j < m_Image->Width; j++) {
-			if (!m_Image->checkWhite(i, j)) {
-				if (!start) {
-					startPoint = MyPoint(i, j);
-					start = true;
-				}
-				endPoint = MyPoint(i, j);
-			}
-		}
-	}*/
-
-	startPoint = MyPoint(49, 265);
-	endPoint = MyPoint(579, 1016);
-
-	x = endPoint.x - startPoint.x;
-	y = endPoint.y - startPoint.y;
-	Image* camCut = new Image(y, x);
-	Image* image = new Image(y, x);
-	for (int i = 0; i < y; i++) {
-		for (int j = 0; j < x; j++) {
-			image->B[i][j] = m_Image->B[startPoint.y + i][startPoint.x + j];
-			image->G[i][j] = m_Image->G[startPoint.y + i][startPoint.x + j];
-			image->R[i][j] = m_Image->R[startPoint.y + i][startPoint.x + j];
-			
-			camCut->B[i][j] = m_Image->B[startPoint.y + i][startPoint.x + j];
-			camCut->G[i][j] = m_Image->G[startPoint.y + i][startPoint.x + j];
-			camCut->R[i][j] = m_Image->R[startPoint.y + i][startPoint.x + j];
-		}
-	}
-
-	Image* diffCut = camCut->copy();
-	for (int i = 0; i < diffCut->Height; i++) {
-		if (i >= baseCut->Height)
-			break;
-
-		for (int j = 0; j < diffCut->Width; j++) {
-			if (j >= baseCut->Width)
-				break;
-
-			float camKido = std::roundf(0.3 * camCut->R[i][j] + 0.59 * camCut->G[i][j] + 0.11 * camCut->B[i][j]);
-			float baseKido = std::roundf(0.3 * baseCut->R[i][j] + 0.59 * baseCut->G[i][j] + 0.11 * baseCut->B[i][j]);
-			float diff = std::abs(camKido - baseKido);
-
-			if (diff < 40) {
-				diffCut->B[i][j] = 0;
-				diffCut->G[i][j] = 0;
-				diffCut->R[i][j] = 0;
-			}
-		}
-	}
-
-	SaveImage(m_Image, "input");
-	SaveImage(baseCut, "baseCut");
-	SaveImage(camCut, "camCut");
-	SaveImage(diffCut, "diffCut");
-
-	showImage(diffCut);
-
-	int count = 1;
-	int count2 = 4;
-	m_ChangeImage->contraction(count);
-	UpdateImage();
-	m_ChangeImage->expansion(image, count);
-	UpdateImage();
-
-	SaveImage(m_Image, "opening");
-
-	m_ChangeImage->expansion(image, count2);
-	UpdateImage();
-	m_ChangeImage->contraction(count2 - 1);
-	UpdateImage();
-
-	SaveImage(m_Image, "closing");
-
-	delete[] diffCut;
-	delete[] baseCut;
-	delete[] camCut;
-	delete[] image;
+	String path = RESULT_PATH;
+	imwrite(path + "input.bmp", input);
+	imwrite(path + "edge.bmp", edge);
+	imwrite(path + "result.bmp", result);
 }
 
 void CSampleDlg::drawOnLine(OnLine line) {
