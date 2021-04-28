@@ -716,28 +716,38 @@ void CSampleDlg::OnTest()
 
 	videoCapture.read(input);
 
-	Mat output, msk, result, edge;
-	std::vector<cv::Vec4i> lines;
+	Mat result;
+	String basePath = IWI_PATH + "BaseBoard.bmp";
+	Mat base = imread(basePath, 1);
+	String templePath = IWI_PATH + "sub.bmp";
+	Mat temp = imread(templePath, 1);
 
-	Canny(input, edge, 50, 100, 3);
+	Mat tempResult;
+	matchTemplate(input, temp, tempResult, TM_CCOEFF_NORMED);
+	Point maxP;
+	double maxVal;
+	minMaxLoc(tempResult, NULL, &maxVal, NULL, &maxP);
+	Mat sub = input(Rect(maxP, Size(temp.cols, temp.rows)));
 
-	HoughLinesP(edge, lines, 1, CV_PI / 180.0, 150, 100, 10);
+	Mat diff, mask;
+	absdiff(temp, sub, diff);
+	threshold(diff, mask, 40, 255, THRESH_BINARY);
 
-	//result = Mat::zeros(input.rows, input.cols, CV_8UC3);
-	//int fromTo[] = { 0,2,0,1,0,0 };
-	////チャンネル数?を増やしてコピー
-	//cv::mixChannels(&input, 1, &result, 1, fromTo, 3);
-	input.copyTo(result);
+	Mat filter;
+	medianBlur(mask, filter, 5);
+	cvtColor(filter, filter, COLOR_BGR2GRAY);
+	threshold(filter, filter, 0, 255, THRESH_BINARY);
 
-	for (auto line : lines) {
-		cv::line(result, cv::Point(line[0], line[1]), cv::Point(line[2], line[3]), cv::Scalar(0, 0, 255), 1);//線の色と太さを指定(B,G,R,太さ)
-	}
+	sub.copyTo(result, filter);
 
-	imshow("", result);
-
+	imshow("result", result);
 	String path = RESULT_PATH;
 	imwrite(path + "input.bmp", input);
-	imwrite(path + "edge.bmp", edge);
+	imwrite(path + "diff.bmp", diff);
+	imwrite(path + "base.bmp", base);
+	imwrite(path + "mask.bmp", mask);
+	imwrite(path + "sub.bmp", sub);
+	imwrite(path + "filter.bmp", filter);
 	imwrite(path + "result.bmp", result);
 }
 
@@ -1309,6 +1319,9 @@ void CSampleDlg::OnSaveBaseBoard()
 {
 	OnGetImage();
 	SaveImage(IWI_PATH + "BaseBoard");
+
+	//Mat sub = input(Rect(Point(209, 30), Size(837, 543)));
+	//imwrite(path + "sub.bmp", sub);
 }
 
 void CSampleDlg::OnOpening()
