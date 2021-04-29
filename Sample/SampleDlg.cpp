@@ -710,11 +710,14 @@ void CSampleDlg::drawBoardPoints() {
 
 void CSampleDlg::OnTest()
 {	
-	if (!videoCapture.isOpened())
+	/*if (!videoCapture.isOpened())
 		if (!initCamera())
 			return;
 
-	videoCapture.read(input);
+	videoCapture.read(input);*/
+
+	String inputPath = RESULT_PATH + "input.bmp";
+	input = imread(inputPath, 1);
 
 	Mat result;
 	String basePath = IWI_PATH + "BaseBoard.bmp";
@@ -723,7 +726,7 @@ void CSampleDlg::OnTest()
 	Mat temp = imread(templePath, 1);
 
 	Mat tempResult;
-	matchTemplate(input, temp, tempResult, TM_CCOEFF_NORMED);
+	matchTemplate(input, temp, tempResult, TM_CCOEFF);
 	Point maxP;
 	double maxVal;
 	minMaxLoc(tempResult, NULL, &maxVal, NULL, &maxP);
@@ -738,6 +741,34 @@ void CSampleDlg::OnTest()
 	cvtColor(filter, filter, COLOR_BGR2GRAY);
 	threshold(filter, filter, 0, 255, THRESH_BINARY);
 
+	Mat labels, stats, centroids;
+	int nLab = connectedComponentsWithStats(filter, labels, stats, centroids, 8, CV_32S);
+
+	int border = 200;
+
+	Mat output(labels.size(), labels.type());
+	Mat_<float> input_1b = Mat_<float>(labels);
+	Mat_<float> labels_1b = Mat_<float>(output);
+	int x = labels_1b.size().width;
+	int y = labels_1b.size().height;
+	for (int i = 0; i < y; ++i) {
+		for (int j = 0; j < x; ++j) {
+			float pixel = input_1b(i, j);
+
+			int step = labels.step;
+			int elem = labels.elemSize();
+			
+			int* label = labels.ptr<int>(i, j);
+			int* param = stats.ptr<int>(*label);
+			int size = param[ConnectedComponentsTypes::CC_STAT_AREA];
+			if (*label != 0 && size > border)
+				pixel = 255;
+			else
+				pixel = 0;
+			filter.at<unsigned char>(i, j) = pixel;
+		}
+	}
+
 	sub.copyTo(result, filter);
 
 	imshow("result", result);
@@ -748,6 +779,10 @@ void CSampleDlg::OnTest()
 	imwrite(path + "mask.bmp", mask);
 	imwrite(path + "sub.bmp", sub);
 	imwrite(path + "filter.bmp", filter);
+	imwrite(path + "labels.bmp", labels);
+	imwrite(path + "stats.bmp", stats);
+	imwrite(path + "centroids.bmp", centroids);
+	imwrite(path + "output.bmp", output);
 	imwrite(path + "result.bmp", result);
 }
 
