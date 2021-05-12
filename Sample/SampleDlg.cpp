@@ -710,14 +710,14 @@ void CSampleDlg::drawBoardPoints() {
 
 void CSampleDlg::OnTest()
 {	
-	/*if (!videoCapture.isOpened())
+	if (!videoCapture.isOpened())
 		if (!initCamera())
 			return;
 
-	videoCapture.read(input);*/
+	videoCapture.read(input);
 
-	String inputPath = RESULT_PATH + "input.bmp";
-	input = imread(inputPath, 1);
+	//String inputPath = RESULT_PATH + "input.bmp";
+	//input = imread(inputPath, 1);
 
 	Mat result;
 	String basePath = IWI_PATH + "BaseBoard.bmp";
@@ -736,16 +736,18 @@ void CSampleDlg::OnTest()
 	absdiff(temp, sub, diff);
 	threshold(diff, mask, 40, 255, THRESH_BINARY);
 
-	Mat filter;
-	medianBlur(mask, filter, 5);
-	cvtColor(filter, filter, COLOR_BGR2GRAY);
-	threshold(filter, filter, 0, 255, THRESH_BINARY);
+	Mat median;
+	medianBlur(mask, median, 5);
+	cvtColor(median, median, COLOR_BGR2GRAY);
+	threshold(median, median, 0, 255, THRESH_BINARY);
 
 	Mat labels, stats, centroids;
-	int nLab = connectedComponentsWithStats(filter, labels, stats, centroids, 8, CV_32S);
+	int nLab = connectedComponentsWithStats(median, labels, stats, centroids, 8, CV_32S);
 
 	int border = 200;
 
+	Mat filter;
+	median.copyTo(filter);
 	Mat output(labels.size(), labels.type());
 	Mat_<float> input_1b = Mat_<float>(labels);
 	Mat_<float> labels_1b = Mat_<float>(output);
@@ -773,17 +775,19 @@ void CSampleDlg::OnTest()
 
 	imshow("result", result);
 	String path = RESULT_PATH;
-	imwrite(path + "input.bmp", input);
-	imwrite(path + "diff.bmp", diff);
-	imwrite(path + "base.bmp", base);
-	imwrite(path + "mask.bmp", mask);
-	imwrite(path + "sub.bmp", sub);
-	imwrite(path + "filter.bmp", filter);
-	imwrite(path + "labels.bmp", labels);
-	imwrite(path + "stats.bmp", stats);
-	imwrite(path + "centroids.bmp", centroids);
-	imwrite(path + "output.bmp", output);
-	imwrite(path + "result.bmp", result);
+	int index = 0;
+	imwrite(path + format("%d_", ++index) + "base.bmp", base);
+	imwrite(path + format("%d_", ++index) + "input.bmp", input);
+	imwrite(path + format("%d_", ++index) + "sub.bmp", sub);
+	imwrite(path + format("%d_", ++index) + "diff.bmp", diff);
+	imwrite(path + format("%d_", ++index) + "mask.bmp", mask);
+	imwrite(path + format("%d_", ++index) + "median.bmp", median);
+	imwrite(path + format("%d_", ++index) + "filter.bmp", filter);
+	imwrite(path + format("%d_", ++index) + "labels.bmp", labels);
+	//imwrite(path + format("%d_", ++index) +"stats.bmp", stats);
+	//imwrite(path + format("%d_", ++index) +"centroids.bmp", centroids);
+	//imwrite(path + format("%d_", ++index) +"output.bmp", output);
+	imwrite(path + format("%d_", ++index) + "result.bmp", result);
 }
 
 void CSampleDlg::drawOnLine(OnLine line) {
