@@ -137,6 +137,7 @@ BEGIN_MESSAGE_MAP(CSampleDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON12, &CSampleDlg::OnSaveBaseBoard)
 	ON_BN_CLICKED(IDC_BUTTON13, &CSampleDlg::OnOpening)
 	ON_BN_CLICKED(IDC_BUTTON14, &CSampleDlg::OnClosing)
+	ON_BN_CLICKED(IDC_BUTTON16, &CSampleDlg::OnCreateCutBoard)
 END_MESSAGE_MAP()
 
 
@@ -722,7 +723,7 @@ void CSampleDlg::OnTest()
 	Mat result;
 	String basePath = IWI_PATH + "BaseBoard.bmp";
 	Mat base = imread(basePath, 1);
-	String templePath = IWI_PATH + "sub.bmp";
+	String templePath = IWI_PATH + "cutBoard.bmp";
 	Mat temp = imread(templePath, 1);
 
 	Mat tempResult;
@@ -1388,4 +1389,47 @@ void CSampleDlg::OnClosing()
 	UpdateImage();
 
 	delete[] image;
+}
+
+
+void CSampleDlg::OnCreateCutBoard()
+{
+	MyPoint minP = MyPoint(99999, 99999);
+	MyPoint maxP = MyPoint(0, 0);
+
+	for (int i = 0; i < m_Image->Height; i++) {
+		for (int j = 0; j < m_Image->Width; j++) {
+			int H = 0;
+			int colors[3] = { m_Image->R[i][j], m_Image->G[i][j], m_Image->B[i][j] };
+			int maxC = max(colors[0], max(colors[1], colors[2]));
+			int minC = min(colors[0], min(colors[1], colors[2]));
+			H = maxC - minC;
+
+			if (H > 50) {
+				if (minP.x > j)
+					minP.x = j;
+				else if (maxP.x < j)
+					maxP.x = j;
+				if (minP.y > i)
+					minP.y = i;
+				else if (maxP.y < i)
+					maxP.y = i;
+			}
+		}
+	}
+
+	int w = maxP.x - minP.x;
+	int h = maxP.y - minP.y;
+
+	Image* cut = new Image(h, w);
+
+	for (int i = 0; i < h; i++) {
+		for (int j = 0; j < w; j++) {
+			cut->B[i][j] = m_Image->B[i + minP.y][j + minP.x];
+			cut->G[i][j] = m_Image->G[i + minP.y][j + minP.x];
+			cut->R[i][j] = m_Image->R[i + minP.y][j + minP.x];
+		}
+	}
+
+	SaveImage(cut, "cutBoard");
 }

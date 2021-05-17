@@ -98,4 +98,5 @@ public:
 	afx_msg void OnOpening();
 	void showImage(Image* image);
 	afx_msg void OnClosing();
+	afx_msg void OnCreateCutBoard();
 };

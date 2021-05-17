@@ -15,8 +15,10 @@
 #define IDC_BUTTON5                     1005
 #define IDC_BUTTON6                     1006
 #define IDC_BUTTON7                     1007
+#define IDC_BUTTON35                    1008
 #define IDC_BUTTON1                     1009
 #define IDC_EDIT_THRESHOLD              1010
+#define IDC_BUTTON36                    1010
 #define IDC_SLIDER_THRESHOLD            1011
 #define IDC_EDIT2                       1012
 #define IDC_RADIO1                      1013
