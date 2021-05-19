@@ -711,13 +711,13 @@ void CSampleDlg::drawBoardPoints() {
 
 void CSampleDlg::OnTest()
 {	
-	//if (!videoCapture.isOpened())
-	//	if (!initCamera())
-	//		return;
-	//videoCapture.read(input);
+	if (!videoCapture.isOpened())
+		if (!initCamera())
+			return;
+	videoCapture.read(input);
 
-	String inputPath = RESULT_PATH + "input.bmp";
-	input = imread(inputPath, 1);
+	//String inputPath = RESULT_PATH + "input.bmp";
+	//input = imread(inputPath, 1);
 
 	Mat result;
 
@@ -726,21 +726,21 @@ void CSampleDlg::OnTest()
 	cvtColor(input, hsv, CV_BGR2HSV);
 
 	//S範囲抽出
-	Scalar sMin = Scalar(0, 200, 0);
-	Scalar sMax = Scalar(180, 255, 255);
+	Scalar sMin = Scalar(0, 0, 150);
+	Scalar sMax = Scalar(180, 100, 255);
 	Mat mask;
 	inRange(hsv, sMin, sMax, mask);
 	
 	////エッジ検出
-	//Mat edge;
-	//Canny(mask, edge, 200, 255);
+	Mat edge;
+	Canny(mask, edge, 200, 255);
 
 	//TODO: エッジ検出してからすべき
 	//ハフ変換
 	Mat hough;
 	input.copyTo(hough);
 	std::vector<Vec4i> lines;
-	HoughLinesP(mask, lines, 1, CV_PI / 180.0, 150, 100, 10);
+	HoughLinesP(edge, lines, 1, CV_PI / 180.0, 150, 100, 10);
 	std::vector<Vec4i>::iterator it = lines.begin();
 	double sumAngle = 0;
 	for (; it != lines.end(); ++it) {
@@ -764,7 +764,7 @@ void CSampleDlg::OnTest()
 	warpAffine(input, affin, affine_matrix, affin.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar::all(0));
 	warpAffine(mask, affin_mask, affine_matrix, affin.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar::all(0));
 
-	//ハフ変換
+	//ハフ変換2
 	Mat hough2 = affin.clone();
 	Point2d minP(INT_MAX, INT_MAX);
 	Point2d maxP(0, 0);
@@ -809,7 +809,7 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", ++index) + "input.bmp", input);
 	imwrite(path + format("%d_", ++index) + "hsv.bmp", hsv);
 	imwrite(path + format("%d_", ++index) + "mask.bmp", mask);
-	//imwrite(path + format("%d_", ++index) + "edge.bmp", edge);
+	imwrite(path + format("%d_", ++index) + "edge.bmp", edge);
 	imwrite(path + format("%d_", ++index) + "hough.bmp", hough);
 	imwrite(path + format("%d_", ++index) + "affin.bmp", affin);
 	imwrite(path + format("%d_", ++index) + "affin_mask.bmp", affin_mask);
@@ -1217,7 +1217,7 @@ bool CSampleDlg::initCamera() {
 	input = Mat::zeros(Size(WIDTH, HEIGHT), CV_8UC3);
 
 	// カメラからのビデオキャプチャを初期化する
-	videoCapture.open(0);
+	videoCapture.open(1);
 	videoCapture.set(CAP_PROP_FRAME_HEIGHT, HEIGHT);
 	videoCapture.set(CAP_PROP_FRAME_WIDTH, WIDTH);
 
