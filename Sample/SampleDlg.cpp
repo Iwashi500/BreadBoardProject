@@ -711,14 +711,13 @@ void CSampleDlg::drawBoardPoints() {
 
 void CSampleDlg::OnTest()
 {	
-	if (!videoCapture.isOpened())
-		if (!initCamera())
-			return;
+	//if (!videoCapture.isOpened())
+	//	if (!initCamera())
+	//		return;
+	//videoCapture.read(input);
 
-	videoCapture.read(input);
-
-	//String inputPath = RESULT_PATH + "input.bmp";
-	//input = imread(inputPath, 1);
+	String inputPath = RESULT_PATH + "input.bmp";
+	input = imread(inputPath, 1);
 
 	Mat result;
 
@@ -731,6 +730,10 @@ void CSampleDlg::OnTest()
 	Scalar sMax = Scalar(180, 255, 255);
 	Mat mask;
 	inRange(hsv, sMin, sMax, mask);
+	
+	////エッジ検出
+	//Mat edge;
+	//Canny(mask, edge, 200, 255);
 
 	//TODO: エッジ検出してからすべき
 	//ハフ変換
@@ -752,18 +755,53 @@ void CSampleDlg::OnTest()
 	//アフィン
 	double angle = sumAngle / lines.size();
 	double scale = 1.0;
-	result = input.clone();
+	Mat affin;
+	Mat affin_mask;
 	Rect roi_rect(cvRound(input.cols * 0), cvRound(input.rows * 0), cvRound(input.cols * 1), cvRound(input.rows * 1));
-	Mat src_roi(input, roi_rect);
-	Mat dst_roi(result, roi_rect);
-	Point2d center(src_roi.cols * 0.5, src_roi.rows * 0.5);
+	Point2d center(input.cols * 0.5, input.rows * 0.5);
 	Mat affine_matrix = getRotationMatrix2D(center, angle, scale);
 
-	warpAffine(src_roi, dst_roi, affine_matrix, dst_roi.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar::all(255));
-	rectangle(input, roi_rect.tl(), roi_rect.br(), Scalar(255, 0, 255), 2);
+	warpAffine(input, affin, affine_matrix, affin.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar::all(0));
+	warpAffine(mask, affin_mask, affine_matrix, affin.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar::all(0));
 
-	//Mat result;
-	//input.copyTo(result, mask);
+	//ハフ変換
+	Mat hough2 = affin.clone();
+	Point2d minP(INT_MAX, INT_MAX);
+	Point2d maxP(0, 0);
+	HoughLinesP(affin_mask, lines, 1, CV_PI / 180.0, 150, 100, 10);
+	std::vector<Vec4i>::iterator it2 = lines.begin();
+	for (; it2 != lines.end(); ++it2) {
+		Vec4i l = *it2;
+		double x = l[2] - l[0];
+		double y = l[3] - l[1];
+		double angle = std::atan2(y, x) * 180 / M_PI;
+		cv::line(hough2, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0, 255, 255), 1);
+
+		if (minP.x > l[0])
+			minP.x = l[0];
+		if (maxP.x < l[0])
+			maxP.x = l[0];
+		if (minP.x > l[2])
+			minP.x = l[2];
+		if (maxP.x < l[2])
+			maxP.x = l[2];
+
+		if (minP.y > l[1])
+			minP.y = l[1];
+		if (maxP.y < l[1])
+			maxP.y = l[1];
+		if (minP.y > l[3])
+			minP.y = l[3];
+		if (maxP.y < l[3])
+			maxP.y = l[3];
+	}
+
+	Size boardSize(maxP.x - minP.x, maxP.y - minP.y);
+	Point2f boardCenter(minP.x + (boardSize.width / 2), minP.y + (boardSize.height / 2));
+	Mat board;
+	getRectSubPix(affin, boardSize, boardCenter, board);
+
+	affin.copyTo(result, affin_mask);
 
 	imshow("result", result);
 	String path = RESULT_PATH;
@@ -771,9 +809,12 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", ++index) + "input.bmp", input);
 	imwrite(path + format("%d_", ++index) + "hsv.bmp", hsv);
 	imwrite(path + format("%d_", ++index) + "mask.bmp", mask);
+	//imwrite(path + format("%d_", ++index) + "edge.bmp", edge);
 	imwrite(path + format("%d_", ++index) + "hough.bmp", hough);
-	imwrite(path + format("%d_", ++index) + "src_roi.bmp", src_roi);
-	imwrite(path + format("%d_", ++index) + "dst_roi.bmp", dst_roi);
+	imwrite(path + format("%d_", ++index) + "affin.bmp", affin);
+	imwrite(path + format("%d_", ++index) + "affin_mask.bmp", affin_mask);
+	imwrite(path + format("%d_", ++index) + "hough2.bmp", hough2);
+	imwrite(path + format("%d_", ++index) + "board.bmp", board);
 	imwrite(path + format("%d_", ++index) + "result.bmp", result);
 }
 
