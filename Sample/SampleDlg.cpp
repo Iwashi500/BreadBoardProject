@@ -721,73 +721,59 @@ void CSampleDlg::OnTest()
 	//input = imread(inputPath, 1);
 
 	Mat result;
-	String basePath = IWI_PATH + "BaseBoard.bmp";
-	Mat base = imread(basePath, 1);
-	String templePath = IWI_PATH + "cutBoard.bmp";
-	Mat temp = imread(templePath, 1);
 
-	Mat tempResult;
-	matchTemplate(input, temp, tempResult, TM_CCOEFF);
-	Point maxP;
-	double maxVal;
-	minMaxLoc(tempResult, NULL, &maxVal, NULL, &maxP);
-	Mat sub = input(Rect(maxP, Size(temp.cols, temp.rows)));
+	//HSV
+	Mat hsv;
+	cvtColor(input, hsv, CV_BGR2HSV);
 
-	Mat diff, mask;
-	absdiff(temp, sub, diff);
-	threshold(diff, mask, 40, 255, THRESH_BINARY);
+	//S範囲抽出
+	Scalar sMin = Scalar(0, 200, 0);
+	Scalar sMax = Scalar(180, 255, 255);
+	Mat mask;
+	inRange(hsv, sMin, sMax, mask);
 
-	Mat median;
-	medianBlur(mask, median, 5);
-	cvtColor(median, median, COLOR_BGR2GRAY);
-	threshold(median, median, 0, 255, THRESH_BINARY);
-
-	Mat labels, stats, centroids;
-	int nLab = connectedComponentsWithStats(median, labels, stats, centroids, 8, CV_32S);
-
-	int border = 200;
-
-	Mat filter;
-	median.copyTo(filter);
-	Mat output(labels.size(), labels.type());
-	Mat_<float> input_1b = Mat_<float>(labels);
-	Mat_<float> labels_1b = Mat_<float>(output);
-	int x = labels_1b.size().width;
-	int y = labels_1b.size().height;
-	for (int i = 0; i < y; ++i) {
-		for (int j = 0; j < x; ++j) {
-			float pixel = input_1b(i, j);
-
-			int step = labels.step;
-			int elem = labels.elemSize();
-			
-			int* label = labels.ptr<int>(i, j);
-			int* param = stats.ptr<int>(*label);
-			int size = param[ConnectedComponentsTypes::CC_STAT_AREA];
-			if (*label != 0 && size > border)
-				pixel = 255;
-			else
-				pixel = 0;
-			filter.at<unsigned char>(i, j) = pixel;
-		}
+	//TODO: エッジ検出してからすべき
+	//ハフ変換
+	Mat hough;
+	input.copyTo(hough);
+	std::vector<Vec4i> lines;
+	HoughLinesP(mask, lines, 1, CV_PI / 180.0, 150, 100, 10);
+	std::vector<Vec4i>::iterator it = lines.begin();
+	double sumAngle = 0;
+	for (; it != lines.end(); ++it) {
+		Vec4i l = *it;
+		double x = l[2] - l[0];
+		double y = l[3] - l[1];
+		double angle = std::atan2(y, x) * 180 / M_PI;
+		sumAngle += angle;
+		cv::line(hough, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0, 255, 255), 1);
 	}
 
-	sub.copyTo(result, filter);
+	//アフィン
+	double angle = sumAngle / lines.size();
+	double scale = 1.0;
+	result = input.clone();
+	Rect roi_rect(cvRound(input.cols * 0), cvRound(input.rows * 0), cvRound(input.cols * 1), cvRound(input.rows * 1));
+	Mat src_roi(input, roi_rect);
+	Mat dst_roi(result, roi_rect);
+	Point2d center(src_roi.cols * 0.5, src_roi.rows * 0.5);
+	Mat affine_matrix = getRotationMatrix2D(center, angle, scale);
+
+	warpAffine(src_roi, dst_roi, affine_matrix, dst_roi.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar::all(255));
+	rectangle(input, roi_rect.tl(), roi_rect.br(), Scalar(255, 0, 255), 2);
+
+	//Mat result;
+	//input.copyTo(result, mask);
 
 	imshow("result", result);
 	String path = RESULT_PATH;
 	int index = 0;
-	imwrite(path + format("%d_", ++index) + "base.bmp", base);
 	imwrite(path + format("%d_", ++index) + "input.bmp", input);
-	imwrite(path + format("%d_", ++index) + "sub.bmp", sub);
-	imwrite(path + format("%d_", ++index) + "diff.bmp", diff);
+	imwrite(path + format("%d_", ++index) + "hsv.bmp", hsv);
 	imwrite(path + format("%d_", ++index) + "mask.bmp", mask);
-	imwrite(path + format("%d_", ++index) + "median.bmp", median);
-	imwrite(path + format("%d_", ++index) + "filter.bmp", filter);
-	imwrite(path + format("%d_", ++index) + "labels.bmp", labels);
-	//imwrite(path + format("%d_", ++index) +"stats.bmp", stats);
-	//imwrite(path + format("%d_", ++index) +"centroids.bmp", centroids);
-	//imwrite(path + format("%d_", ++index) +"output.bmp", output);
+	imwrite(path + format("%d_", ++index) + "hough.bmp", hough);
+	imwrite(path + format("%d_", ++index) + "src_roi.bmp", src_roi);
+	imwrite(path + format("%d_", ++index) + "dst_roi.bmp", dst_roi);
 	imwrite(path + format("%d_", ++index) + "result.bmp", result);
 }
 
