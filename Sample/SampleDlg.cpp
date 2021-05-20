@@ -138,6 +138,7 @@ BEGIN_MESSAGE_MAP(CSampleDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON13, &CSampleDlg::OnOpening)
 	ON_BN_CLICKED(IDC_BUTTON14, &CSampleDlg::OnClosing)
 	ON_BN_CLICKED(IDC_BUTTON16, &CSampleDlg::OnCreateCutBoard)
+	ON_BN_CLICKED(IDC_BUTTON15, &CSampleDlg::OnHoukoku)
 END_MESSAGE_MAP()
 
 
@@ -716,7 +717,7 @@ void CSampleDlg::OnTest()
 			return;
 	videoCapture.read(input);
 
-	//String inputPath = RESULT_PATH + "input.bmp";
+	//String inputPath = RESULT_PATH + "input2.bmp";
 	//input = imread(inputPath, 1);
 
 	Mat result;
@@ -724,9 +725,7 @@ void CSampleDlg::OnTest()
 	//HSV
 	Mat hsv;
 	cvtColor(input, hsv, CV_BGR2HSV);
-
-	//S範囲抽出
-	Scalar sMin = Scalar(0, 0, 150);
+	Scalar sMin = Scalar(0, 0, 120);
 	Scalar sMax = Scalar(180, 100, 255);
 	Mat mask;
 	inRange(hsv, sMin, sMax, mask);
@@ -735,73 +734,103 @@ void CSampleDlg::OnTest()
 	Mat edge;
 	Canny(mask, edge, 200, 255);
 
-	//TODO: エッジ検出してからすべき
-	//ハフ変換
-	Mat hough;
-	input.copyTo(hough);
-	std::vector<Vec4i> lines;
-	HoughLinesP(edge, lines, 1, CV_PI / 180.0, 150, 100, 10);
-	std::vector<Vec4i>::iterator it = lines.begin();
-	double sumAngle = 0;
-	for (; it != lines.end(); ++it) {
-		Vec4i l = *it;
-		double x = l[2] - l[0];
-		double y = l[3] - l[1];
-		double angle = std::atan2(y, x) * 180 / M_PI;
-		sumAngle += angle;
-		cv::line(hough, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0, 255, 255), 1);
-	}
+	Mat pers;
+	std::vector<Point2f> src;
+	std::vector<Point2f> dst;
 
-	//アフィン
-	double angle = sumAngle / lines.size();
-	double scale = 1.0;
-	Mat affin;
-	Mat affin_mask;
-	Rect roi_rect(cvRound(input.cols * 0), cvRound(input.rows * 0), cvRound(input.cols * 1), cvRound(input.rows * 1));
-	Point2d center(input.cols * 0.5, input.rows * 0.5);
-	Mat affine_matrix = getRotationMatrix2D(center, angle, scale);
+	//2
+	//src.push_back(Point2f(84, 63));
+	//src.push_back(Point2f(1056, 29));
+	//src.push_back(Point2f(130, 709));
+	//src.push_back(Point2f(1083, 630));
 
-	warpAffine(input, affin, affine_matrix, affin.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar::all(0));
-	warpAffine(mask, affin_mask, affine_matrix, affin.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar::all(0));
+	//3
+	//src.push_back(Point2f(181, 43));
+	//src.push_back(Point2f(1138, 92));
+	//src.push_back(Point2f(167, 689));
+	//src.push_back(Point2f(1117, 689));
 
-	//ハフ変換2
-	Mat hough2 = affin.clone();
-	Point2d minP(INT_MAX, INT_MAX);
-	Point2d maxP(0, 0);
-	HoughLinesP(affin_mask, lines, 1, CV_PI / 180.0, 150, 100, 10);
-	std::vector<Vec4i>::iterator it2 = lines.begin();
-	for (; it2 != lines.end(); ++it2) {
-		Vec4i l = *it2;
-		double x = l[2] - l[0];
-		double y = l[3] - l[1];
-		double angle = std::atan2(y, x) * 180 / M_PI;
-		cv::line(hough2, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0, 255, 255), 1);
+	//4
+	src.push_back(Point2f(120, 43));
+	src.push_back(Point2f(1086, 34));
+	src.push_back(Point2f(147, 690));
+	src.push_back(Point2f(1101, 633));
 
-		if (minP.x > l[0])
-			minP.x = l[0];
-		if (maxP.x < l[0])
-			maxP.x = l[0];
-		if (minP.x > l[2])
-			minP.x = l[2];
-		if (maxP.x < l[2])
-			maxP.x = l[2];
+	dst.push_back(Point2f(0, 0));
+	dst.push_back(Point2f(1279, 0));
+	dst.push_back(Point2f(0, 719));
+	dst.push_back(Point2f(1279, 719));
+	Mat h = getPerspectiveTransform(src, dst);
+	warpPerspective(edge, pers, h, edge.size());
+	warpPerspective(input, result, h, input.size());
 
-		if (minP.y > l[1])
-			minP.y = l[1];
-		if (maxP.y < l[1])
-			maxP.y = l[1];
-		if (minP.y > l[3])
-			minP.y = l[3];
-		if (maxP.y < l[3])
-			maxP.y = l[3];
-	}
+	////TODO: エッジ検出してからすべき
+	////ハフ変換
+	//Mat hough;
+	//input.copyTo(hough);
+	//std::vector<Vec4i> lines;
+	//HoughLinesP(edge, lines, 1, CV_PI / 180.0, 150, 100, 10);
+	//std::vector<Vec4i>::iterator it = lines.begin();
+	//double sumAngle = 0;
+	//for (; it != lines.end(); ++it) {
+	//	Vec4i l = *it;
+	//	double x = l[2] - l[0];
+	//	double y = l[3] - l[1];
+	//	double angle = std::atan2(y, x) * 180 / M_PI;
+	//	sumAngle += angle;
+	//	cv::line(hough, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0, 255, 255), 1);
+	//}
 
-	Size boardSize(maxP.x - minP.x, maxP.y - minP.y);
-	Point2f boardCenter(minP.x + (boardSize.width / 2), minP.y + (boardSize.height / 2));
-	Mat board;
-	getRectSubPix(affin, boardSize, boardCenter, board);
+	////アフィン
+	//double angle = sumAngle / lines.size();
+	//double scale = 1.0;
+	//Mat affin;
+	//Mat affin_mask;
+	//Rect roi_rect(cvRound(input.cols * 0), cvRound(input.rows * 0), cvRound(input.cols * 1), cvRound(input.rows * 1));
+	//Point2d center(input.cols * 0.5, input.rows * 0.5);
+	//Mat affine_matrix = getRotationMatrix2D(center, angle, scale);
 
-	affin.copyTo(result, affin_mask);
+	//warpAffine(input, affin, affine_matrix, affin.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar::all(0));
+	//warpAffine(mask, affin_mask, affine_matrix, affin.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar::all(0));
+
+	////ハフ変換2
+	//Mat hough2 = affin.clone();
+	//Point2d minP(INT_MAX, INT_MAX);
+	//Point2d maxP(0, 0);
+	//HoughLinesP(affin_mask, lines, 1, CV_PI / 180.0, 150, 100, 10);
+	//std::vector<Vec4i>::iterator it2 = lines.begin();
+	//for (; it2 != lines.end(); ++it2) {
+	//	Vec4i l = *it2;
+	//	double x = l[2] - l[0];
+	//	double y = l[3] - l[1];
+	//	double angle = std::atan2(y, x) * 180 / M_PI;
+	//	cv::line(hough2, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0, 255, 255), 1);
+
+	//	if (minP.x > l[0])
+	//		minP.x = l[0];
+	//	if (maxP.x < l[0])
+	//		maxP.x = l[0];
+	//	if (minP.x > l[2])
+	//		minP.x = l[2];
+	//	if (maxP.x < l[2])
+	//		maxP.x = l[2];
+
+	//	if (minP.y > l[1])
+	//		minP.y = l[1];
+	//	if (maxP.y < l[1])
+	//		maxP.y = l[1];
+	//	if (minP.y > l[3])
+	//		minP.y = l[3];
+	//	if (maxP.y < l[3])
+	//		maxP.y = l[3];
+	//}
+
+	//Size boardSize(maxP.x - minP.x, maxP.y - minP.y);
+	//Point2f boardCenter(minP.x + (boardSize.width / 2), minP.y + (boardSize.height / 2));
+	//Mat board;
+	//getRectSubPix(affin, boardSize, boardCenter, board);
+
+	//affin.copyTo(result, affin_mask);
 
 	imshow("result", result);
 	String path = RESULT_PATH;
@@ -810,11 +839,38 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", ++index) + "hsv.bmp", hsv);
 	imwrite(path + format("%d_", ++index) + "mask.bmp", mask);
 	imwrite(path + format("%d_", ++index) + "edge.bmp", edge);
-	imwrite(path + format("%d_", ++index) + "hough.bmp", hough);
-	imwrite(path + format("%d_", ++index) + "affin.bmp", affin);
-	imwrite(path + format("%d_", ++index) + "affin_mask.bmp", affin_mask);
-	imwrite(path + format("%d_", ++index) + "hough2.bmp", hough2);
-	imwrite(path + format("%d_", ++index) + "board.bmp", board);
+	imwrite(path + format("%d_", ++index) + "pers.bmp", pers);
+	//imwrite(path + format("%d_", ++index) + "hough.bmp", hough);
+	//imwrite(path + format("%d_", ++index) + "affin.bmp", affin);
+	//imwrite(path + format("%d_", ++index) + "affin_mask.bmp", affin_mask);
+	//imwrite(path + format("%d_", ++index) + "hough2.bmp", hough2);
+	//imwrite(path + format("%d_", ++index) + "board.bmp", board);
+	imwrite(path + format("%d_", ++index) + "result.bmp", result);
+}
+
+void CSampleDlg::OnHoukoku()
+{
+	String inputPath2 = RESULT_PATH + "result3.bmp";
+	Mat	input2 = imread(inputPath2, 1);
+	String inputPath3 = RESULT_PATH + "result4.bmp";
+	Mat input3 = imread(inputPath3, 1);
+	Mat result;
+
+	Mat diff, mask1, mask2, mask3;
+	absdiff(input2, input3, diff);
+	threshold(diff, mask1, 50, 255, THRESH_BINARY);
+	cvtColor(mask1, mask2, COLOR_BGR2GRAY);
+	threshold(mask2, mask3, 40, 255, THRESH_BINARY);
+
+	input2.copyTo(result, mask3);
+	imshow("result", result);
+
+	String path = RESULT_PATH;
+	int index = 0;
+	imwrite(path + format("%d_", ++index) + "diff.bmp", diff);
+	imwrite(path + format("%d_", ++index) + "mask1.bmp", mask1);
+	imwrite(path + format("%d_", ++index) + "mask2.bmp", mask2);
+	imwrite(path + format("%d_", ++index) + "mask3.bmp", mask3);
 	imwrite(path + format("%d_", ++index) + "result.bmp", result);
 }
 
