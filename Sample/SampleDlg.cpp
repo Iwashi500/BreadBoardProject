@@ -138,6 +138,7 @@ BEGIN_MESSAGE_MAP(CSampleDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON13, &CSampleDlg::OnOpening)
 	ON_BN_CLICKED(IDC_BUTTON14, &CSampleDlg::OnClosing)
 	ON_BN_CLICKED(IDC_BUTTON16, &CSampleDlg::OnCreateCutBoard)
+	ON_BN_CLICKED(IDC_BUTTON15, &CSampleDlg::OnHoukoku)
 END_MESSAGE_MAP()
 
 
@@ -711,42 +712,63 @@ void CSampleDlg::drawBoardPoints() {
 
 void CSampleDlg::OnTest()
 {	
-	if (!videoCapture.isOpened())
-		if (!initCamera())
-			return;
+	//if (!videoCapture.isOpened())
+	//	if (!initCamera())
+	//		return;
+	//videoCapture.read(input);
 
-	videoCapture.read(input);
-
-	//String inputPath = RESULT_PATH + "input.bmp";
-	//input = imread(inputPath, 1);
+	String inputPath = RESULT_PATH + "input.bmp";
+	input = imread(inputPath, 1);
 
 	Mat result;
+
+	//HSV
+	Mat hsv;
+	cvtColor(input, hsv, CV_BGR2HSV);
+	Scalar sMin = Scalar(0, 0, 120);
+	Scalar sMax = Scalar(180, 100, 255);
+	Mat mask;
+	inRange(hsv, sMin, sMax, mask);
+	
+	//エッジ検出
+	Mat edge;
+	Canny(mask, edge, 200, 255);
+
+	//射影変換(固定座標)
+	Mat pers, pers_edge;
+	std::vector<Point2f> src;
+	std::vector<Point2f> dst;
+	src.push_back(Point2f(84, 63));
+	src.push_back(Point2f(1056, 29));
+	src.push_back(Point2f(130, 709));
+	src.push_back(Point2f(1083, 630));
+	dst.push_back(Point2f(0, 0));
+	dst.push_back(Point2f(1279, 0));
+	dst.push_back(Point2f(0, 719));
+	dst.push_back(Point2f(1279, 719));
+	Mat h = getPerspectiveTransform(src, dst);
+	warpPerspective(edge, pers_edge, h, edge.size());
+	warpPerspective(input, pers, h, input.size());
+
+	//背景画像読み込み_(射影変換済み)
 	String basePath = IWI_PATH + "BaseBoard.bmp";
 	Mat base = imread(basePath, 1);
-	String templePath = IWI_PATH + "cutBoard.bmp";
-	Mat temp = imread(templePath, 1);
 
-	Mat tempResult;
-	matchTemplate(input, temp, tempResult, TM_CCOEFF);
-	Point maxP;
-	double maxVal;
-	minMaxLoc(tempResult, NULL, &maxVal, NULL, &maxP);
-	Mat sub = input(Rect(maxP, Size(temp.cols, temp.rows)));
+	//背景差分
+	Mat diff, niti;
+	absdiff(base, pers, diff);
+	threshold(diff, niti, 40, 255, THRESH_BINARY);
 
-	Mat diff, mask;
-	absdiff(temp, sub, diff);
-	threshold(diff, mask, 40, 255, THRESH_BINARY);
-
+	//メディアンフィルタ
 	Mat median;
-	medianBlur(mask, median, 5);
+	medianBlur(niti, median, 5);
 	cvtColor(median, median, COLOR_BGR2GRAY);
 	threshold(median, median, 0, 255, THRESH_BINARY);
 
+	//ラベリング
 	Mat labels, stats, centroids;
 	int nLab = connectedComponentsWithStats(median, labels, stats, centroids, 8, CV_32S);
-
 	int border = 200;
-
 	Mat filter;
 	median.copyTo(filter);
 	Mat output(labels.size(), labels.type());
@@ -760,7 +782,7 @@ void CSampleDlg::OnTest()
 
 			int step = labels.step;
 			int elem = labels.elemSize();
-			
+
 			int* label = labels.ptr<int>(i, j);
 			int* param = stats.ptr<int>(*label);
 			int size = param[ConnectedComponentsTypes::CC_STAT_AREA];
@@ -772,22 +794,49 @@ void CSampleDlg::OnTest()
 		}
 	}
 
-	sub.copyTo(result, filter);
+	//結果画像生成
+	pers.copyTo(result, filter);
 
+	//画像保存
 	imshow("result", result);
 	String path = RESULT_PATH;
 	int index = 0;
-	imwrite(path + format("%d_", ++index) + "base.bmp", base);
 	imwrite(path + format("%d_", ++index) + "input.bmp", input);
-	imwrite(path + format("%d_", ++index) + "sub.bmp", sub);
-	imwrite(path + format("%d_", ++index) + "diff.bmp", diff);
+	imwrite(path + format("%d_", ++index) + "hsv.bmp", hsv);
 	imwrite(path + format("%d_", ++index) + "mask.bmp", mask);
+	imwrite(path + format("%d_", ++index) + "edge.bmp", edge);
+	imwrite(path + format("%d_", ++index) + "pers.bmp", pers);
+	imwrite(path + format("%d_", ++index) + "pers_edge.bmp", pers_edge);
+	imwrite(path + format("%d_", ++index) + "diff.bmp", diff);
+	imwrite(path + format("%d_", ++index) + "niti.bmp", niti);
 	imwrite(path + format("%d_", ++index) + "median.bmp", median);
 	imwrite(path + format("%d_", ++index) + "filter.bmp", filter);
-	imwrite(path + format("%d_", ++index) + "labels.bmp", labels);
-	//imwrite(path + format("%d_", ++index) +"stats.bmp", stats);
-	//imwrite(path + format("%d_", ++index) +"centroids.bmp", centroids);
-	//imwrite(path + format("%d_", ++index) +"output.bmp", output);
+	imwrite(path + format("%d_", ++index) + "result.bmp", result);
+}
+
+void CSampleDlg::OnHoukoku()
+{
+	String inputPath2 = RESULT_PATH + "result3.bmp";
+	Mat	input2 = imread(inputPath2, 1);
+	String inputPath3 = RESULT_PATH + "result4.bmp";
+	Mat input3 = imread(inputPath3, 1);
+	Mat result;
+
+	Mat diff, mask1, mask2, mask3;
+	absdiff(input2, input3, diff);
+	threshold(diff, mask1, 50, 255, THRESH_BINARY);
+	cvtColor(mask1, mask2, COLOR_BGR2GRAY);
+	threshold(mask2, mask3, 40, 255, THRESH_BINARY);
+
+	input2.copyTo(result, mask3);
+	imshow("result", result);
+
+	String path = RESULT_PATH;
+	int index = 0;
+	imwrite(path + format("%d_", ++index) + "diff.bmp", diff);
+	imwrite(path + format("%d_", ++index) + "mask1.bmp", mask1);
+	imwrite(path + format("%d_", ++index) + "mask2.bmp", mask2);
+	imwrite(path + format("%d_", ++index) + "mask3.bmp", mask3);
 	imwrite(path + format("%d_", ++index) + "result.bmp", result);
 }
 
@@ -1190,7 +1239,7 @@ bool CSampleDlg::initCamera() {
 	input = Mat::zeros(Size(WIDTH, HEIGHT), CV_8UC3);
 
 	// カメラからのビデオキャプチャを初期化する
-	videoCapture.open(0);
+	videoCapture.open(1);
 	videoCapture.set(CAP_PROP_FRAME_HEIGHT, HEIGHT);
 	videoCapture.set(CAP_PROP_FRAME_WIDTH, WIDTH);
 
