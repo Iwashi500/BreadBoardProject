@@ -100,4 +100,6 @@ public:
 	afx_msg void OnClosing();
 	afx_msg void OnCreateCutBoard();
 	afx_msg void OnHoukoku();
+	afx_msg void OnHoleDetection();
+	void getBoardRect(const Mat input, Rect& area);
 };

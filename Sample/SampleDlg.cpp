@@ -139,6 +139,7 @@ BEGIN_MESSAGE_MAP(CSampleDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON14, &CSampleDlg::OnClosing)
 	ON_BN_CLICKED(IDC_BUTTON16, &CSampleDlg::OnCreateCutBoard)
 	ON_BN_CLICKED(IDC_BUTTON15, &CSampleDlg::OnHoukoku)
+	ON_BN_CLICKED(IDC_BUTTON17, &CSampleDlg::OnHoleDetection)
 END_MESSAGE_MAP()
 
 
@@ -712,13 +713,13 @@ void CSampleDlg::drawBoardPoints() {
 
 void CSampleDlg::OnTest()
 {	
-	//if (!videoCapture.isOpened())
-	//	if (!initCamera())
-	//		return;
-	//videoCapture.read(input);
+	if (!videoCapture.isOpened())
+		if (!initCamera())
+			return;
+	videoCapture.read(input);
 
-	String inputPath = RESULT_PATH + "input.bmp";
-	input = imread(inputPath, 1);
+	//String inputPath = RESULT_PATH + "input.bmp";
+	//input = imread(inputPath, 1);
 
 	Mat result;
 
@@ -812,6 +813,131 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", ++index) + "median.bmp", median);
 	imwrite(path + format("%d_", ++index) + "filter.bmp", filter);
 	imwrite(path + format("%d_", ++index) + "result.bmp", result);
+}
+
+void CSampleDlg::OnHoleDetection()
+{
+	if (!videoCapture.isOpened())
+		if (!initCamera())
+			return;
+	videoCapture.read(input);
+
+	//String inputPath = RESULT_PATH + "input.bmp";
+	//input = imread(inputPath, 1);
+
+	Mat result;
+
+	//HSV
+	Mat hsv;
+	cvtColor(input, hsv, CV_BGR2HSV);
+	Scalar sMin = Scalar(0, 0, 120);
+	Scalar sMax = Scalar(180, 100, 255);
+	Mat mask;
+	inRange(hsv, sMin, sMax, mask);
+
+	//エッジ検出
+	Mat edge;
+	Canny(mask, edge, 200, 255);
+
+	//上下線の領域取得
+	Point minP, maxP;
+	Rect area;
+	getBoardRect(input, area);
+
+	//穴マスク画像生成
+	Mat holeMask(Size(input.cols, input.rows), CV_8UC3, Scalar(0));
+	rectangle(holeMask, area, Scalar(255, 255, 255), -1);
+
+	//収縮処理
+	Mat erosion;
+	morphologyEx(mask, erosion, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(5, 1)));
+
+	//反転
+	Mat reverse;
+	cv::bitwise_not(erosion, reverse);
+
+	//ラベリング
+	Mat labels, stats, centroids;
+	int nLab = connectedComponentsWithStats(reverse, labels, stats, centroids, 8, CV_32S);
+	int border = 200;
+	Mat filter;
+	reverse.copyTo(filter);
+	Mat output(labels.size(), labels.type());
+	Mat_<float> input_1b = Mat_<float>(labels);
+	Mat_<float> labels_1b = Mat_<float>(output);
+	int x = labels_1b.size().width;
+	int y = labels_1b.size().height;
+	for (int i = 0; i < y; ++i) {
+		for (int j = 0; j < x; ++j) {
+			float pixel = input_1b(i, j);
+
+			int step = labels.step;
+			int elem = labels.elemSize();
+
+			int* label = labels.ptr<int>(i, j);
+			int* param = stats.ptr<int>(*label);
+			int size = param[ConnectedComponentsTypes::CC_STAT_AREA];
+			if (*label != 0 && size < border)
+				pixel = 255;
+			else
+				pixel = 0;
+			filter.at<unsigned char>(i, j) = pixel;
+		}
+	}
+
+	//搭載穴の左上検出
+	Mat hole;
+	input.copyTo(hole, filter);
+	hole.copyTo(hole, holeMask);
+	Point leftTop(area.x, area.y);
+	Point dis(81, 46);
+	Point holeP(leftTop.x + dis.x, leftTop.y + dis.y);
+	int* label = labels.ptr<int>(holeP.y, holeP.x);
+	if (label != 0) {
+		int* param = stats.ptr<int>(*label);
+		int x = param[ConnectedComponentsTypes::CC_STAT_LEFT];
+		int y = param[ConnectedComponentsTypes::CC_STAT_TOP];
+		int w = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
+		int h = param[ConnectedComponentsTypes::CC_STAT_HEIGHT];
+
+		rectangle(hole, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
+	}
+
+	//結果画像生成
+	result = hole.clone();
+	rectangle(result, area, Scalar(255, 0, 0), 2);
+
+	//画像保存
+	imshow("result", result);
+	String path = RESULT_PATH;
+	int index = 0;
+	imwrite(path + format("%d_", ++index) + "input.bmp", input);
+	imwrite(path + format("%d_", ++index) + "hsv.bmp", hsv);
+	imwrite(path + format("%d_", ++index) + "mask.bmp", mask);
+	imwrite(path + format("%d_", ++index) + "edge.bmp", edge);
+	imwrite(path + format("%d_", ++index) + "holeMask.bmp", holeMask);
+	imwrite(path + format("%d_", ++index) + "erosion.bmp", erosion);
+	imwrite(path + format("%d_", ++index) + "reverse.bmp", reverse);
+	imwrite(path + format("%d_", ++index) + "filter.bmp", filter);
+	imwrite(path + format("%d_", ++index) + "hole.bmp", hole);
+	imwrite(path + format("%d_", ++index) + "result.bmp", result);
+}
+
+void CSampleDlg::getBoardRect(const Mat input, Rect& area) {
+	//HSV
+	Mat hsv;
+	cvtColor(input, hsv, CV_BGR2HSV);
+	Scalar sMin = Scalar(0, 0, 120);
+	Scalar sMax = Scalar(180, 100, 255);
+	Mat mask;
+	inRange(hsv, sMin, sMax, mask);
+
+	//メディアンフィルタ
+	Mat median;
+	medianBlur(mask, median, 5);
+
+	//矩形探索
+	area = boundingRect(median);
 }
 
 void CSampleDlg::OnHoukoku()
@@ -1254,7 +1380,7 @@ bool CSampleDlg::initCamera() {
 void CSampleDlg::OnCameraStart()
 {
 	//initCamera();
-	m_timerID = SetTimer(1, 100, NULL);
+	m_timerID = SetTimer(1, 500, NULL);
 }
 
 void CSampleDlg::OnCameraStop()
@@ -1275,8 +1401,6 @@ void CSampleDlg::OnTimer(UINT_PTR nIDEvent)
 	{
 	case 1:
 		OnGetImage();
-		//OnChangeHSV();
-		baseDiff();
 		break;
 	default:
 		break;
