@@ -712,13 +712,13 @@ void CSampleDlg::drawBoardPoints() {
 
 void CSampleDlg::OnTest()
 {	
-	if (!videoCapture.isOpened())
-		if (!initCamera())
-			return;
-	videoCapture.read(input);
+	//if (!videoCapture.isOpened())
+	//	if (!initCamera())
+	//		return;
+	//videoCapture.read(input);
 
-	//String inputPath = RESULT_PATH + "input2.bmp";
-	//input = imread(inputPath, 1);
+	String inputPath = RESULT_PATH + "input.bmp";
+	input = imread(inputPath, 1);
 
 	Mat result;
 
@@ -730,108 +730,74 @@ void CSampleDlg::OnTest()
 	Mat mask;
 	inRange(hsv, sMin, sMax, mask);
 	
-	////エッジ検出
+	//エッジ検出
 	Mat edge;
 	Canny(mask, edge, 200, 255);
 
-	Mat pers;
+	//射影変換(固定座標)
+	Mat pers, pers_edge;
 	std::vector<Point2f> src;
 	std::vector<Point2f> dst;
-
-	//2
-	//src.push_back(Point2f(84, 63));
-	//src.push_back(Point2f(1056, 29));
-	//src.push_back(Point2f(130, 709));
-	//src.push_back(Point2f(1083, 630));
-
-	//3
-	//src.push_back(Point2f(181, 43));
-	//src.push_back(Point2f(1138, 92));
-	//src.push_back(Point2f(167, 689));
-	//src.push_back(Point2f(1117, 689));
-
-	//4
-	src.push_back(Point2f(120, 43));
-	src.push_back(Point2f(1086, 34));
-	src.push_back(Point2f(147, 690));
-	src.push_back(Point2f(1101, 633));
-
+	src.push_back(Point2f(84, 63));
+	src.push_back(Point2f(1056, 29));
+	src.push_back(Point2f(130, 709));
+	src.push_back(Point2f(1083, 630));
 	dst.push_back(Point2f(0, 0));
 	dst.push_back(Point2f(1279, 0));
 	dst.push_back(Point2f(0, 719));
 	dst.push_back(Point2f(1279, 719));
 	Mat h = getPerspectiveTransform(src, dst);
-	warpPerspective(edge, pers, h, edge.size());
-	warpPerspective(input, result, h, input.size());
+	warpPerspective(edge, pers_edge, h, edge.size());
+	warpPerspective(input, pers, h, input.size());
 
-	////TODO: エッジ検出してからすべき
-	////ハフ変換
-	//Mat hough;
-	//input.copyTo(hough);
-	//std::vector<Vec4i> lines;
-	//HoughLinesP(edge, lines, 1, CV_PI / 180.0, 150, 100, 10);
-	//std::vector<Vec4i>::iterator it = lines.begin();
-	//double sumAngle = 0;
-	//for (; it != lines.end(); ++it) {
-	//	Vec4i l = *it;
-	//	double x = l[2] - l[0];
-	//	double y = l[3] - l[1];
-	//	double angle = std::atan2(y, x) * 180 / M_PI;
-	//	sumAngle += angle;
-	//	cv::line(hough, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0, 255, 255), 1);
-	//}
+	//背景画像読み込み_(射影変換済み)
+	String basePath = IWI_PATH + "BaseBoard.bmp";
+	Mat base = imread(basePath, 1);
 
-	////アフィン
-	//double angle = sumAngle / lines.size();
-	//double scale = 1.0;
-	//Mat affin;
-	//Mat affin_mask;
-	//Rect roi_rect(cvRound(input.cols * 0), cvRound(input.rows * 0), cvRound(input.cols * 1), cvRound(input.rows * 1));
-	//Point2d center(input.cols * 0.5, input.rows * 0.5);
-	//Mat affine_matrix = getRotationMatrix2D(center, angle, scale);
+	//背景差分
+	Mat diff, niti;
+	absdiff(base, pers, diff);
+	threshold(diff, niti, 40, 255, THRESH_BINARY);
 
-	//warpAffine(input, affin, affine_matrix, affin.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar::all(0));
-	//warpAffine(mask, affin_mask, affine_matrix, affin.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar::all(0));
+	//メディアンフィルタ
+	Mat median;
+	medianBlur(niti, median, 5);
+	cvtColor(median, median, COLOR_BGR2GRAY);
+	threshold(median, median, 0, 255, THRESH_BINARY);
 
-	////ハフ変換2
-	//Mat hough2 = affin.clone();
-	//Point2d minP(INT_MAX, INT_MAX);
-	//Point2d maxP(0, 0);
-	//HoughLinesP(affin_mask, lines, 1, CV_PI / 180.0, 150, 100, 10);
-	//std::vector<Vec4i>::iterator it2 = lines.begin();
-	//for (; it2 != lines.end(); ++it2) {
-	//	Vec4i l = *it2;
-	//	double x = l[2] - l[0];
-	//	double y = l[3] - l[1];
-	//	double angle = std::atan2(y, x) * 180 / M_PI;
-	//	cv::line(hough2, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0, 255, 255), 1);
+	//ラベリング
+	Mat labels, stats, centroids;
+	int nLab = connectedComponentsWithStats(median, labels, stats, centroids, 8, CV_32S);
+	int border = 200;
+	Mat filter;
+	median.copyTo(filter);
+	Mat output(labels.size(), labels.type());
+	Mat_<float> input_1b = Mat_<float>(labels);
+	Mat_<float> labels_1b = Mat_<float>(output);
+	int x = labels_1b.size().width;
+	int y = labels_1b.size().height;
+	for (int i = 0; i < y; ++i) {
+		for (int j = 0; j < x; ++j) {
+			float pixel = input_1b(i, j);
 
-	//	if (minP.x > l[0])
-	//		minP.x = l[0];
-	//	if (maxP.x < l[0])
-	//		maxP.x = l[0];
-	//	if (minP.x > l[2])
-	//		minP.x = l[2];
-	//	if (maxP.x < l[2])
-	//		maxP.x = l[2];
+			int step = labels.step;
+			int elem = labels.elemSize();
 
-	//	if (minP.y > l[1])
-	//		minP.y = l[1];
-	//	if (maxP.y < l[1])
-	//		maxP.y = l[1];
-	//	if (minP.y > l[3])
-	//		minP.y = l[3];
-	//	if (maxP.y < l[3])
-	//		maxP.y = l[3];
-	//}
+			int* label = labels.ptr<int>(i, j);
+			int* param = stats.ptr<int>(*label);
+			int size = param[ConnectedComponentsTypes::CC_STAT_AREA];
+			if (*label != 0 && size > border)
+				pixel = 255;
+			else
+				pixel = 0;
+			filter.at<unsigned char>(i, j) = pixel;
+		}
+	}
 
-	//Size boardSize(maxP.x - minP.x, maxP.y - minP.y);
-	//Point2f boardCenter(minP.x + (boardSize.width / 2), minP.y + (boardSize.height / 2));
-	//Mat board;
-	//getRectSubPix(affin, boardSize, boardCenter, board);
+	//結果画像生成
+	pers.copyTo(result, filter);
 
-	//affin.copyTo(result, affin_mask);
-
+	//画像保存
 	imshow("result", result);
 	String path = RESULT_PATH;
 	int index = 0;
@@ -840,11 +806,11 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", ++index) + "mask.bmp", mask);
 	imwrite(path + format("%d_", ++index) + "edge.bmp", edge);
 	imwrite(path + format("%d_", ++index) + "pers.bmp", pers);
-	//imwrite(path + format("%d_", ++index) + "hough.bmp", hough);
-	//imwrite(path + format("%d_", ++index) + "affin.bmp", affin);
-	//imwrite(path + format("%d_", ++index) + "affin_mask.bmp", affin_mask);
-	//imwrite(path + format("%d_", ++index) + "hough2.bmp", hough2);
-	//imwrite(path + format("%d_", ++index) + "board.bmp", board);
+	imwrite(path + format("%d_", ++index) + "pers_edge.bmp", pers_edge);
+	imwrite(path + format("%d_", ++index) + "diff.bmp", diff);
+	imwrite(path + format("%d_", ++index) + "niti.bmp", niti);
+	imwrite(path + format("%d_", ++index) + "median.bmp", median);
+	imwrite(path + format("%d_", ++index) + "filter.bmp", filter);
 	imwrite(path + format("%d_", ++index) + "result.bmp", result);
 }
 
