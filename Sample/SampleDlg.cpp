@@ -890,18 +890,8 @@ void CSampleDlg::OnHoleDetection()
 	input.copyTo(hole, filter);
 	hole.copyTo(hole, holeMask);
 	Point leftTop(area.x, area.y);
-	Point dis(81, 46);
-	Point holeP(leftTop.x + dis.x, leftTop.y + dis.y);
-	int* label = labels.ptr<int>(holeP.y, holeP.x);
-	if (label != 0) {
-		int* param = stats.ptr<int>(*label);
-		int x = param[ConnectedComponentsTypes::CC_STAT_LEFT];
-		int y = param[ConnectedComponentsTypes::CC_STAT_TOP];
-		int w = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
-		int h = param[ConnectedComponentsTypes::CC_STAT_HEIGHT];
 
-		rectangle(hole, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
-	}
+	detectBoardHole(hole, hole, leftTop, labels, stats);
 
 	//結果画像生成
 	result = hole.clone();
@@ -921,6 +911,88 @@ void CSampleDlg::OnHoleDetection()
 	imwrite(path + format("%d_", ++index) + "filter.bmp", filter);
 	imwrite(path + format("%d_", ++index) + "hole.bmp", hole);
 	imwrite(path + format("%d_", ++index) + "result.bmp", result);
+}
+
+void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labels, Mat status) {
+	result = input.clone();
+	Point dis(75, 53);
+	Point hole(leftTop.x + dis.x, leftTop.y + dis.y);
+	Point leftHole = hole;
+	Point distance(30, 30);
+	int disAddX = 60;
+	Point disAddY(-11, 83);
+	Point disAddY2(15, 80);
+	int holeGapY = 87;
+	int i = 0;
+	int j = 0;
+
+
+	for (i = 0; i < 14; i++) {
+		//+-列の穴
+		if (i == 0 || i == 1 || i == 12 || i == 13) {
+			for (j = 0; j < 25; j++) {
+				//穴があったら表示　+　補正
+				int* label = labels.ptr<int>(hole.y, hole.x);
+				if (label != 0) {
+					int* param = status.ptr<int>(*label);
+					int x = param[ConnectedComponentsTypes::CC_STAT_LEFT];
+					int y = param[ConnectedComponentsTypes::CC_STAT_TOP];
+					int w = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
+					int h = param[ConnectedComponentsTypes::CC_STAT_HEIGHT];
+					hole = Point(x + w / 2, y + h / 2);
+
+					rectangle(result, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
+					circle(result, hole, 2, Scalar(0, 0, 255), 1);
+				}
+				if (j == 0) {
+					leftHole = hole;
+				}
+
+				if (j % 5 == 4) 
+					hole.x += disAddX;
+				else
+					hole.x += distance.x;
+			}
+		}
+		else {
+			for (j = 0; j < 30; j++) {
+				//穴があったら表示　+　補正
+				int* label = labels.ptr<int>(hole.y, hole.x);
+				if (label != 0) {
+					int* param = status.ptr<int>(*label);
+					int x = param[ConnectedComponentsTypes::CC_STAT_LEFT];
+					int y = param[ConnectedComponentsTypes::CC_STAT_TOP];
+					int w = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
+					int h = param[ConnectedComponentsTypes::CC_STAT_HEIGHT];
+					hole = Point(x + w / 2, y + h / 2);
+
+					rectangle(result, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
+					circle(result, hole, 2, Scalar(0, 0, 255), 1);
+				}
+				if (j == 0) {
+					leftHole = hole;
+				}
+
+				hole.x += distance.x;
+			}
+		}
+
+		hole = leftHole;
+		if (i == 1) {
+			hole.x += disAddY.x;
+			hole.y += disAddY.y;
+		}
+		else if (i == 11) {
+			hole.x += disAddY2.x;
+			hole.y += disAddY2.y;
+		}
+		else if (i == 6) {
+			hole.y += holeGapY;
+		}
+		else {
+			hole.y += distance.y;
+		}
+	}
 }
 
 void CSampleDlg::getBoardRect(const Mat input, Rect& area) {
@@ -1365,7 +1437,7 @@ bool CSampleDlg::initCamera() {
 	input = Mat::zeros(Size(WIDTH, HEIGHT), CV_8UC3);
 
 	// カメラからのビデオキャプチャを初期化する
-	videoCapture.open(1);
+	videoCapture.open(0);
 	videoCapture.set(CAP_PROP_FRAME_HEIGHT, HEIGHT);
 	videoCapture.set(CAP_PROP_FRAME_WIDTH, WIDTH);
 
