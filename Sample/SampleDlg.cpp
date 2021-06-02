@@ -850,7 +850,7 @@ void CSampleDlg::OnHoleDetection()
 
 	//収縮処理
 	Mat erosion;
-	morphologyEx(mask, erosion, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(5, 1)));
+	morphologyEx(mask, erosion, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(5, 5)));
 
 	//反転
 	Mat reverse;
@@ -859,7 +859,8 @@ void CSampleDlg::OnHoleDetection()
 	//ラベリング
 	Mat labels, stats, centroids;
 	int nLab = connectedComponentsWithStats(reverse, labels, stats, centroids, 8, CV_32S);
-	int border = 200;
+	Mat filLabels = labels.clone();
+	int border = 400;
 	Mat filter;
 	reverse.copyTo(filter);
 	Mat output(labels.size(), labels.type());
@@ -870,17 +871,15 @@ void CSampleDlg::OnHoleDetection()
 	for (int i = 0; i < y; ++i) {
 		for (int j = 0; j < x; ++j) {
 			float pixel = input_1b(i, j);
-
-			int step = labels.step;
-			int elem = labels.elemSize();
-
-			int* label = labels.ptr<int>(i, j);
+			int* label = filLabels.ptr<int>(i, j);
 			int* param = stats.ptr<int>(*label);
 			int size = param[ConnectedComponentsTypes::CC_STAT_AREA];
 			if (*label != 0 && size < border)
 				pixel = 255;
-			else
+			else {
 				pixel = 0;
+				*label = 0;
+			}
 			filter.at<unsigned char>(i, j) = pixel;
 		}
 	}
@@ -891,10 +890,12 @@ void CSampleDlg::OnHoleDetection()
 	hole.copyTo(hole, holeMask);
 	Point leftTop(area.x, area.y);
 
-	detectBoardHole(hole, hole, leftTop, labels, stats);
+	//搭載穴の検出
+	Mat holeResult;
+	detectBoardHole(hole, holeResult, leftTop, filLabels, stats);
 
 	//結果画像生成
-	result = hole.clone();
+	result = holeResult.clone();
 	rectangle(result, area, Scalar(255, 0, 0), 2);
 
 	//画像保存
@@ -908,8 +909,11 @@ void CSampleDlg::OnHoleDetection()
 	imwrite(path + format("%d_", ++index) + "holeMask.bmp", holeMask);
 	imwrite(path + format("%d_", ++index) + "erosion.bmp", erosion);
 	imwrite(path + format("%d_", ++index) + "reverse.bmp", reverse);
+	imwrite(path + format("%d_", ++index) + "labels.bmp", labels);
+	imwrite(path + format("%d_", ++index) + "filLabels.bmp", filLabels);
 	imwrite(path + format("%d_", ++index) + "filter.bmp", filter);
 	imwrite(path + format("%d_", ++index) + "hole.bmp", hole);
+	imwrite(path + format("%d_", ++index) + "holeResult.bmp", holeResult);
 	imwrite(path + format("%d_", ++index) + "result.bmp", result);
 }
 
@@ -958,7 +962,7 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 			for (j = 0; j < 30; j++) {
 				//穴があったら表示　+　補正
 				int* label = labels.ptr<int>(hole.y, hole.x);
-				if (label != 0) {
+				if (*label != 0) {
 					int* param = status.ptr<int>(*label);
 					int x = param[ConnectedComponentsTypes::CC_STAT_LEFT];
 					int y = param[ConnectedComponentsTypes::CC_STAT_TOP];
