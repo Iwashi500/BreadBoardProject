@@ -103,4 +103,5 @@ public:
 	afx_msg void OnHoleDetection();
 	void getBoardRect(const Mat input, Rect& area);
 	void detectBoardHole(Mat input, Mat &result, Point leftTop, const Mat labels, const Mat status);
+	void saveHole(Point position, int index);
 };

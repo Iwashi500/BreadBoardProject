@@ -85,6 +85,7 @@ CSampleDlg::CSampleDlg(CWnd* pParent /*=nullptr*/)
 	//LocalConfigクラスの作成が必要(Local設定ファイルのため.gitignore)
 	IWI_PATH = LocalConfig::saveBasePath();
 	RESULT_PATH = LocalConfig::saveResultPath();
+	breadBoard = BreadBoard();
 }
 
 //デストラクタ
@@ -652,63 +653,119 @@ void CSampleDlg::OnBack()
 }
 
 void CSampleDlg::drawBoardPoints() {
-	std::list<MyPoint> points;
-	MyPoint base(54, 20);
-	MyPoint add(8, 8);
+	//std::list<MyPoint> points;
+	//MyPoint base(54, 20);
+	//MyPoint add(8, 8);
 
-	for (int j = 0; j < 63; j++) {
-		OnLine onLine;
-		ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
-		for (int i = 0; i < 5; i++) {
-			int y = base.y + add.y * i;
-			int x = base.x + add.x * j;
-			MyPoint point(y, x);
-			m_Image->drawPoint(point, 3);
-			chain.pushNext(point);
-			onLine.push(chain);
-		}
-		breadBoard.push(onLine);
-	}
-
-	base.y = 110;
-	for (int j = 0; j < 63; j++) {
-		OnLine onLine;
-		ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
-		for (int i = 0; i < 5; i++) {
-			int y = base.y + add.y * i;
-			int x = base.x + add.x * j;
-			MyPoint point(y, x);
-			m_Image->drawPoint(point, 3);
-			chain.pushNext(point);
-			onLine.push(chain);
-		}
-		breadBoard.push(onLine);
-	}
-
-	for (OnLine onLine : breadBoard.getOnLines()) {
-		drawOnLine(onLine);
-	}
-
-	//base.y = 24;
-	//base.x = 36;
-	//for (int i = 0; i < 2; i++) {
-	//	for (int j = 0; j < 59; j++) {
+	//for (int j = 0; j < 63; j++) {
+	//	OnLine onLine;
+	//	ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
+	//	for (int i = 0; i < 5; i++) {
 	//		int y = base.y + add.y * i;
 	//		int x = base.x + add.x * j;
-	//		drawPoint(MyPoint(y, x), 3);
+	//		MyPoint point(y, x);
+	//		m_Image->drawPoint(point, 3);
+	//		chain.pushNext(point);
+	//		onLine.push(chain);
 	//	}
+	//	breadBoard.push(onLine);
 	//}
 
-	//base.y = 165;
-	//for (int i = 0; i < 2; i++) {
-	//	for (int j = 0; j < 59; j++) {
+	//base.y = 110;
+	//for (int j = 0; j < 63; j++) {
+	//	OnLine onLine;
+	//	ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
+	//	for (int i = 0; i < 5; i++) {
 	//		int y = base.y + add.y * i;
 	//		int x = base.x + add.x * j;
-	//		drawPoint(MyPoint(y, x), 3);
+	//		MyPoint point(y, x);
+	//		m_Image->drawPoint(point, 3);
+	//		chain.pushNext(point);
+	//		onLine.push(chain);
 	//	}
+	//	breadBoard.push(onLine);
 	//}
 
-	UpdateImage();
+	//for (OnLine onLine : breadBoard.getOnLines()) {
+	//	drawOnLine(onLine);
+	//}
+
+	////base.y = 24;
+	////base.x = 36;
+	////for (int i = 0; i < 2; i++) {
+	////	for (int j = 0; j < 59; j++) {
+	////		int y = base.y + add.y * i;
+	////		int x = base.x + add.x * j;
+	////		drawPoint(MyPoint(y, x), 3);
+	////	}
+	////}
+
+	////base.y = 165;
+	////for (int i = 0; i < 2; i++) {
+	////	for (int j = 0; j < 59; j++) {
+	////		int y = base.y + add.y * i;
+	////		int x = base.x + add.x * j;
+	////		drawPoint(MyPoint(y, x), 3);
+	////	}
+	////}
+
+	//UpdateImage();std::list<MyPoint> points;
+	//MyPoint base(54, 20);
+	//MyPoint add(8, 8);
+
+	//for (int j = 0; j < 63; j++) {
+	//	OnLine onLine;
+	//	ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
+	//	for (int i = 0; i < 5; i++) {
+	//		int y = base.y + add.y * i;
+	//		int x = base.x + add.x * j;
+	//		MyPoint point(y, x);
+	//		m_Image->drawPoint(point, 3);
+	//		chain.pushNext(point);
+	//		onLine.push(chain);
+	//	}
+	//	breadBoard.push(onLine);
+	//}
+
+	//base.y = 110;
+	//for (int j = 0; j < 63; j++) {
+	//	OnLine onLine;
+	//	ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
+	//	for (int i = 0; i < 5; i++) {
+	//		int y = base.y + add.y * i;
+	//		int x = base.x + add.x * j;
+	//		MyPoint point(y, x);
+	//		m_Image->drawPoint(point, 3);
+	//		chain.pushNext(point);
+	//		onLine.push(chain);
+	//	}
+	//	breadBoard.push(onLine);
+	//}
+
+	//for (OnLine onLine : breadBoard.getOnLines()) {
+	//	drawOnLine(onLine);
+	//}
+
+	////base.y = 24;
+	////base.x = 36;
+	////for (int i = 0; i < 2; i++) {
+	////	for (int j = 0; j < 59; j++) {
+	////		int y = base.y + add.y * i;
+	////		int x = base.x + add.x * j;
+	////		drawPoint(MyPoint(y, x), 3);
+	////	}
+	////}
+
+	////base.y = 165;
+	////for (int i = 0; i < 2; i++) {
+	////	for (int j = 0; j < 59; j++) {
+	////		int y = base.y + add.y * i;
+	////		int x = base.x + add.x * j;
+	////		drawPoint(MyPoint(y, x), 3);
+	////	}
+	////}
+
+	//UpdateImage();
 }
 
 void CSampleDlg::OnTest()
@@ -817,21 +874,21 @@ void CSampleDlg::OnTest()
 
 void CSampleDlg::OnHoleDetection()
 {
-	if (!videoCapture.isOpened())
-		if (!initCamera())
-			return;
-	videoCapture.read(input);
+	//if (!videoCapture.isOpened())
+	//	if (!initCamera())
+	//		return;
+	//videoCapture.read(input);
 
-	//String inputPath = RESULT_PATH + "input.bmp";
-	//input = imread(inputPath, 1);
+	String inputPath = RESULT_PATH + "input.bmp";
+	input = imread(inputPath, 1);
 
 	Mat result;
 
 	//HSV
 	Mat hsv;
 	cvtColor(input, hsv, CV_BGR2HSV);
-	Scalar sMin = Scalar(0, 0, 120);
-	Scalar sMax = Scalar(180, 100, 255);
+	Scalar sMin = Scalar(0, 0, 115);
+	Scalar sMax = Scalar(180, 20, 255);
 	Mat mask;
 	inRange(hsv, sMin, sMax, mask);
 
@@ -850,18 +907,21 @@ void CSampleDlg::OnHoleDetection()
 
 	//収縮処理
 	Mat erosion;
-	morphologyEx(mask, erosion, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(5, 5)));
+	morphologyEx(mask, erosion, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(2, 2)));
 
 	//反転
 	Mat reverse;
 	cv::bitwise_not(erosion, reverse);
 
+	//Mat reverse;
+	//morphologyEx(mask, reverse, MORPH_DILATE, getStructuringElement(MORPH_RECT, Size(2, 2)));
+
 	//ラベリング
 	Mat labels, stats, centroids;
 	int nLab = connectedComponentsWithStats(reverse, labels, stats, centroids, 8, CV_32S);
 	Mat filLabels = labels.clone();
-	int borderMax = 400;
-	int borderMin = 120;
+	int borderMax = 300;
+	int borderMin = 50;
 	Mat filter;
 	reverse.copyTo(filter);
 	Mat output(labels.size(), labels.type());
@@ -908,7 +968,7 @@ void CSampleDlg::OnHoleDetection()
 	imwrite(path + format("%d_", ++index) + "mask.bmp", mask);
 	imwrite(path + format("%d_", ++index) + "edge.bmp", edge);
 	imwrite(path + format("%d_", ++index) + "holeMask.bmp", holeMask);
-	imwrite(path + format("%d_", ++index) + "erosion.bmp", erosion);
+	//imwrite(path + format("%d_", ++index) + "erosion.bmp", erosion);
 	imwrite(path + format("%d_", ++index) + "reverse.bmp", reverse);
 	imwrite(path + format("%d_", ++index) + "labels.bmp", labels);
 	imwrite(path + format("%d_", ++index) + "filLabels.bmp", filLabels);
@@ -930,9 +990,9 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 	int holeGapY = 87;
 	int i = 0;
 	int j = 0;
-	std::vector<std::vector<Point>> holePositions;
-	std::vector<Point> unusedHoles;
-	std::vector<Point> usedHoles;
+	//std::vector<std::vector<Point>> holePositions;
+	//std::vector<Point> unusedHoles;
+	//std::vector<Point> usedHoles;
 
 
 	for (i = 0; i < 14; i++) {
@@ -959,10 +1019,10 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 					rectangle(result, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
 					circle(result, hole, 2, Scalar(0, 0, 255), 1);
 
-					unusedHoles.push_back(Point(j, i));
+					breadBoard.unusedHoles.push_back(Point(j, i));
 				}
 				else {
-					usedHoles.push_back(Point(j, i));
+					breadBoard.usedHoles.push_back(Point(j, i));
 				}
 
 				positions.push_back(hole);
@@ -997,10 +1057,10 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 					rectangle(result, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
 					circle(result, hole, 2, Scalar(0, 0, 255), 1);
 
-					unusedHoles.push_back(Point(j, i));
+					breadBoard.unusedHoles.push_back(Point(j, i));
 				}
 				else {
-					usedHoles.push_back(Point(j, i));
+					breadBoard.usedHoles.push_back(Point(j, i));
 				}
 
 				positions.push_back(hole);
@@ -1029,13 +1089,14 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 			hole.y += distance.y;
 		}
 
-		holePositions.push_back(positions);
+		breadBoard.holePositions.push_back(positions);
 	}
 
 	//使用している穴
-	for (auto itr = usedHoles.begin(); itr != usedHoles.end(); ++itr) {
+	i = 0;
+	for (auto itr = breadBoard.usedHoles.begin(); itr != breadBoard.usedHoles.end(); ++itr) {
 		Point position = *itr;
-		Point usedHole = holePositions.at(position.y).at(position.x);
+		Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
 		int s = 4;
 		int x = usedHole.x - s;
 		int y = usedHole.y - s;
@@ -1044,18 +1105,33 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 
 		rectangle(result, Rect(Point(x, y), Point(w, h)), Scalar(255, 255, 0), 2);
 
-		for (auto itr2 = itr; itr2 != usedHoles.end(); ++itr2) {
-			Point position2 = *itr2;
-			int diffX = abs(position.x - position2.x);
-			int diffY = abs(position.y - position2.y);
-
-			if (diffX <= 1 && diffY <= 1) {
-				Point usedHole2 = holePositions.at(position2.y).at(position2.x);
-
-				line(result, usedHole, usedHole2, Scalar(0, 255, 255), 3, 8);
-			}
-		}
+		saveHole(position, i++);
 	}
+}
+
+void CSampleDlg::saveHole(Point position, int index) {
+	Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
+	int size = 10;
+	int x = usedHole.x - size;
+	int y = usedHole.y - size;
+	int w = usedHole.x + size;
+	int h = usedHole.y + size;
+
+	Mat hole = Mat(input, Rect(Point(x, y), Point(w, h)));
+
+	Scalar sMin = Scalar(0, 0, 0);
+	Scalar sMax = Scalar(50, 50, 50);
+	inRange(hole, sMin, sMax, hole);
+	//cvtColor(input, hsv, CV_BGR2HSV);
+	//Scalar sMin = Scalar(0, 0, 120);
+	//Scalar sMax = Scalar(180, 100, 255);
+	//Mat mask;
+	//inRange(hsv, sMin, sMax, mask);
+	//Canny(hole, hole, 200, 255);
+	
+
+	String path = RESULT_PATH + "holes\\";
+	imwrite(path + format("%d",index) + "_hole" + BreadBoard::getHoleName(position) + ".bmp", hole);
 }
 
 void CSampleDlg::getBoardRect(const Mat input, Rect& area) {

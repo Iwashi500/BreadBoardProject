@@ -3,14 +3,19 @@
 #include "MyPoint.h"
 #include "ChainPoint.h"
 #include "OnLine.h"
+#include <opencv2/opencv.hpp>
 
+using namespace std;
+using namespace cv;
 class BreadBoard
 {
-private:
-	std::list<OnLine> onLines;
-
 public:
-	void push(OnLine onLine) {
+	vector<Point> usedHoles;
+	vector<Point> unusedHoles;
+	vector<vector<Point>> holePositions;
+
+	static String getHoleName(Point position);
+	/*void push(OnLine onLine) {
 		onLines.push_back(onLine);
 	}
 
@@ -18,7 +23,7 @@ public:
 		return this->onLines;
 	}
 
-	OnLine getOnLine(MyPoint point);
+	OnLine getOnLine(MyPoint point);*/
 };
 
 
