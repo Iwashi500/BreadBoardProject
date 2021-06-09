@@ -1142,6 +1142,8 @@ HoleType CSampleDlg::saveHole(Point position) {
 		holeType.type = HoleType::MIDDLE;
 	else if (*kido < 50)
 		holeType.type = HoleType::MIDDLE;
+	else if (*kido > 175)
+		holeType.type = HoleType::MIDDLE;
 	else
 		holeType.type = HoleType::EDGE;
 
