@@ -15,6 +15,8 @@ public:
 	vector<vector<Point>> holePositions;
 
 	static String getHoleName(Point position);
+
+
 	/*void push(OnLine onLine) {
 		onLines.push_back(onLine);
 	}

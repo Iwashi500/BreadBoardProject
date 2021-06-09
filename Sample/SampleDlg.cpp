@@ -30,6 +30,7 @@
 #endif
 
 using namespace cv;
+using namespace std;
 
 // アプリケーションのバージョン情報に使われる CAboutDlg ダイアログ
 class CAboutDlg : public CDialogEx
@@ -86,6 +87,7 @@ CSampleDlg::CSampleDlg(CWnd* pParent /*=nullptr*/)
 	IWI_PATH = LocalConfig::saveBasePath();
 	RESULT_PATH = LocalConfig::saveResultPath();
 	breadBoard = BreadBoard();
+	fileIndex = 0;
 }
 
 //デストラクタ
@@ -962,20 +964,19 @@ void CSampleDlg::OnHoleDetection()
 	//画像保存
 	imshow("result", result);
 	String path = RESULT_PATH;
-	int index = 0;
-	imwrite(path + format("%d_", ++index) + "input.bmp", input);
-	imwrite(path + format("%d_", ++index) + "hsv.bmp", hsv);
-	imwrite(path + format("%d_", ++index) + "mask.bmp", mask);
-	imwrite(path + format("%d_", ++index) + "edge.bmp", edge);
-	imwrite(path + format("%d_", ++index) + "holeMask.bmp", holeMask);
-	//imwrite(path + format("%d_", ++index) + "erosion.bmp", erosion);
-	imwrite(path + format("%d_", ++index) + "reverse.bmp", reverse);
-	imwrite(path + format("%d_", ++index) + "labels.bmp", labels);
-	imwrite(path + format("%d_", ++index) + "filLabels.bmp", filLabels);
-	imwrite(path + format("%d_", ++index) + "filter.bmp", filter);
-	imwrite(path + format("%d_", ++index) + "hole.bmp", hole);
-	imwrite(path + format("%d_", ++index) + "holeResult.bmp", holeResult);
-	imwrite(path + format("%d_", ++index) + "result.bmp", result);
+	imwrite(path + format("%d_", getFileIndex()) + "input.bmp", input);
+	imwrite(path + format("%d_", getFileIndex()) + "hsv.bmp", hsv);
+	imwrite(path + format("%d_", getFileIndex()) + "mask.bmp", mask);
+	imwrite(path + format("%d_", getFileIndex()) + "edge.bmp", edge);
+	imwrite(path + format("%d_", getFileIndex()) + "holeMask.bmp", holeMask);
+	//imwrite(path + format("%d_", getFileIndex()) + "erosion.bmp", erosion);
+	imwrite(path + format("%d_", getFileIndex()) + "reverse.bmp", reverse);
+	imwrite(path + format("%d_", getFileIndex()) + "labels.bmp", labels);
+	imwrite(path + format("%d_", getFileIndex()) + "filLabels.bmp", filLabels);
+	imwrite(path + format("%d_", getFileIndex()) + "filter.bmp", filter);
+	imwrite(path + format("%d_", getFileIndex()) + "hole.bmp", hole);
+	imwrite(path + format("%d_", getFileIndex()) + "holeResult.bmp", holeResult);
+	imwrite(path + format("%d_", getFileIndex()) + "result.bmp", result);
 }
 
 void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labels, Mat status) {
@@ -990,10 +991,6 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 	int holeGapY = 87;
 	int i = 0;
 	int j = 0;
-	//std::vector<std::vector<Point>> holePositions;
-	//std::vector<Point> unusedHoles;
-	//std::vector<Point> usedHoles;
-
 
 	for (i = 0; i < 14; i++) {
 		std::vector<Point> positions;
@@ -1103,13 +1100,24 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 		int w = usedHole.x + s;
 		int h = usedHole.y + s;
 
-		rectangle(result, Rect(Point(x, y), Point(w, h)), Scalar(255, 255, 0), 2);
+		HoleType holeType = saveHole(position);
+		Scalar color;
+		if (holeType.type == HoleType::MIDDLE)
+			color = Scalar(255, 255, 0);
+		else if (holeType.type == HoleType::EDGE)
+			color = Scalar(0, 255, 255);
+		else if (holeType.type == HoleType::EMPTY)
+			color = Scalar(0, 255, 0);
+		rectangle(result, Rect(Point(x, y), Point(w, h)), color, 2);
 
-		saveHole(position, i++);
 	}
 }
 
-void CSampleDlg::saveHole(Point position, int index) {
+int CSampleDlg::getFileIndex() {
+	return ++fileIndex;
+}
+
+HoleType CSampleDlg::saveHole(Point position) {
 	Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
 	int size = 10;
 	int x = usedHole.x - size;
@@ -1117,21 +1125,50 @@ void CSampleDlg::saveHole(Point position, int index) {
 	int w = usedHole.x + size;
 	int h = usedHole.y + size;
 
-	Mat hole = Mat(input, Rect(Point(x, y), Point(w, h)));
-
-	Scalar sMin = Scalar(0, 0, 0);
-	Scalar sMax = Scalar(50, 50, 50);
-	inRange(hole, sMin, sMax, hole);
-	//cvtColor(input, hsv, CV_BGR2HSV);
-	//Scalar sMin = Scalar(0, 0, 120);
-	//Scalar sMax = Scalar(180, 100, 255);
-	//Mat mask;
-	//inRange(hsv, sMin, sMax, mask);
-	//Canny(hole, hole, 200, 255);
-	
-
+	Mat holeRaw = Mat(input, Rect(Point(x, y), Point(w, h)));
 	String path = RESULT_PATH + "holes\\";
-	imwrite(path + format("%d",index) + "_hole" + BreadBoard::getHoleName(position) + ".bmp", hole);
+	String holeName = format("%d", getFileIndex()) + "_hole" + BreadBoard::getHoleName(position);
+	HoleType holeType;
+
+	Mat hsv, gray;
+	cvtColor(holeRaw, gray, CV_BGR2GRAY);
+	cvtColor(holeRaw, hsv, CV_BGR2HSV);
+	
+	unsigned char* color = hsv.ptr<unsigned char>(size, size);
+	unsigned char hsvValue[3] = { *(color + 2) , *(color + 1), *color };
+	unsigned char* kido = gray.ptr<unsigned char>(size, size);
+
+	if (hsvValue[1] > 150)
+		holeType.type = HoleType::MIDDLE;
+	else if (*kido < 50)
+		holeType.type = HoleType::MIDDLE;
+	else
+		holeType.type = HoleType::EDGE;
+
+	Mat range;
+	Scalar sMin = Scalar(0, 0, 150);
+	Scalar sMax = Scalar(180, 255, 255);
+	inRange(hsv, sMin, sMax, range);
+
+	Mat canny;
+	Canny(range, canny, 200, 255);
+
+	vector<Vec4i> lines;
+	Mat hough = canny.clone();
+	cvtColor(hough, hough, CV_GRAY2BGR);
+	HoughLinesP(canny, lines, 1, CV_PI / 180.0, size*2, size, size * 2);
+	for (auto line : lines) {
+		cv::line(hough, Point(line[0], line[1]), Point(line[2], line[3]), Scalar(0, 0, 255), 1);
+	}
+
+	imwrite(path + holeName + "_raw" +   "_" + holeType.toString() + ".bmp", holeRaw);
+	imwrite(path + holeName + "_hsv" +   "_" + holeType.toString() + ".bmp", hsv);
+	imwrite(path + holeName + "_gray" +  "_" + holeType.toString() + ".bmp", gray);
+	imwrite(path + holeName + "_canny" + "_" + holeType.toString() + ".bmp", canny);
+	imwrite(path + holeName + "_hough" + "_" + holeType.toString() + ".bmp", hough);
+	imwrite(path + holeName + "_range" + "_" + holeType.toString() + ".bmp", range);
+
+	return holeType;
 }
 
 void CSampleDlg::getBoardRect(const Mat input, Rect& area) {

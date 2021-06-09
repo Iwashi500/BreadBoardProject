@@ -51,6 +51,9 @@
     <ClInclude Include="LocalConfig.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="HoleType.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Sample.cpp">
@@ -77,6 +80,9 @@
     <ClCompile Include="OnLine.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="HoleType.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Sample.rc">
@@ -90,6 +96,9 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\Sample.ico">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="..\..\..\..\..\Desktop\IWI\ブレッドボード.bmp">
       <Filter>リソース ファイル</Filter>
     </Image>
   </ItemGroup>

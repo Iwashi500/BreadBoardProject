@@ -2,7 +2,7 @@
 #include "BreadBoard.h"
 
 String BreadBoard::getHoleName(Point position) {
-	String xName = format("%d", position.x - 1);
+	String xName = format("%d", position.x + 1);
 	String yName;
 	switch (position.y)
 	{
