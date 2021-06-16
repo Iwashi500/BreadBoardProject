@@ -910,6 +910,7 @@ void CSampleDlg::OnHoleDetection()
 	//収縮処理
 	Mat erosion;
 	morphologyEx(mask, erosion, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(2, 2)));
+	erosion = mask.clone();
 
 	//反転
 	Mat reverse;
@@ -920,7 +921,7 @@ void CSampleDlg::OnHoleDetection()
 
 	//ラベリング
 	Mat labels, stats, centroids;
-	int nLab = connectedComponentsWithStats(reverse, labels, stats, centroids, 8, CV_32S);
+	int nLab = connectedComponentsWithStats(reverse, labels, stats, centroids, 4, CV_32S);
 	Mat filLabels = labels.clone();
 	int borderMax = 300;
 	int borderMin = 50;
@@ -1119,15 +1120,15 @@ int CSampleDlg::getFileIndex() {
 
 HoleType CSampleDlg::saveHole(Point position) {
 	Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
-	int size = 10;
+	int size = 25;
 	int x = usedHole.x - size;
 	int y = usedHole.y - size;
 	int w = usedHole.x + size;
 	int h = usedHole.y + size;
 
-	Mat holeRaw = Mat(input, Rect(Point(x, y), Point(w, h)));
+	Mat holeRaw = Mat(input, Rect(Point(x, y), Point(w, h))).clone();
 	String path = RESULT_PATH + "holes\\";
-	String holeName = format("%d", getFileIndex()) + "_hole" + BreadBoard::getHoleName(position);
+	String holeName =  "hole_" + BreadBoard::getHoleName(position);
 	HoleType holeType;
 
 	Mat hsv, gray;
@@ -1138,37 +1139,71 @@ HoleType CSampleDlg::saveHole(Point position) {
 	unsigned char hsvValue[3] = { *(color + 2) , *(color + 1), *color };
 	unsigned char* kido = gray.ptr<unsigned char>(size, size);
 
-	if (hsvValue[1] > 150)
-		holeType.type = HoleType::MIDDLE;
-	else if (*kido < 50)
-		holeType.type = HoleType::MIDDLE;
-	else if (*kido > 175)
-		holeType.type = HoleType::MIDDLE;
-	else
-		holeType.type = HoleType::EDGE;
+	//if (hsvValue[1] > 150)
+	//	holeType.type = HoleType::MIDDLE;
+	//else if (*kido < 50)
+	//	holeType.type = HoleType::MIDDLE;
+	//else if (*kido > 175)
+	//	holeType.type = HoleType::MIDDLE;
+	if (false)
+		printf("");
+	//端と判定されたらさらにラベリングで判定
+	else {
 
-	Mat range;
-	Scalar sMin = Scalar(0, 0, 150);
-	Scalar sMax = Scalar(180, 255, 255);
-	inRange(hsv, sMin, sMax, range);
+		Mat range, range_rev;
+		Scalar sMin = Scalar(0, 0, 130);
+		Scalar sMax = Scalar(180, 50, 255);
+		inRange(hsv, sMin, sMax, range);
+		cv::bitwise_not(range, range_rev);
 
-	Mat canny;
-	Canny(range, canny, 200, 255);
 
-	vector<Vec4i> lines;
-	Mat hough = canny.clone();
-	cvtColor(hough, hough, CV_GRAY2BGR);
-	HoughLinesP(canny, lines, 1, CV_PI / 180.0, size*2, size, size * 2);
-	for (auto line : lines) {
-		cv::line(hough, Point(line[0], line[1]), Point(line[2], line[3]), Scalar(0, 0, 255), 1);
+		Mat labels, status, centroids;
+		connectedComponentsWithStats(range, labels, status, centroids, 4, CV_32S);
+
+		int* label = labels.ptr<int>(size, size);
+		if (*label == 0)
+			connectedComponentsWithStats(range_rev, labels, status, centroids, 4, CV_32S);
+		else
+			printf("");
+
+		int* param = status.ptr<int>(*label);
+		int left = param[ConnectedComponentsTypes::CC_STAT_LEFT];
+		int top = param[ConnectedComponentsTypes::CC_STAT_TOP];
+		int width = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
+		int height = param[ConnectedComponentsTypes::CC_STAT_HEIGHT];
+		int right = left + width;
+		int down = top + height;
+
+		if (width >= size * 2 || height >= size * 2)
+			holeType = HoleType::MIDDLE;
+		else {
+			int edgeCount = 0;
+			if (left == 0)
+				edgeCount++;
+			if (right == size * 2)
+				edgeCount++;
+			if (top == 0)
+				edgeCount++;
+			if (down == size * 2)
+				edgeCount++;
+
+			if (edgeCount >= 2)
+				holeType.type = HoleType::MIDDLE;
+			else
+			holeType.type = HoleType::EDGE;
+		}
+
+		imwrite(path + holeName + "_range" + ".bmp", range);
+		imwrite(path + holeName + "_range_rev" + ".bmp", range_rev);
+		imwrite(path + holeName + "_labels" + ".bmp", labels);
 	}
 
-	imwrite(path + holeName + "_raw" +   "_" + holeType.toString() + ".bmp", holeRaw);
-	imwrite(path + holeName + "_hsv" +   "_" + holeType.toString() + ".bmp", hsv);
-	imwrite(path + holeName + "_gray" +  "_" + holeType.toString() + ".bmp", gray);
-	imwrite(path + holeName + "_canny" + "_" + holeType.toString() + ".bmp", canny);
-	imwrite(path + holeName + "_hough" + "_" + holeType.toString() + ".bmp", hough);
-	imwrite(path + holeName + "_range" + "_" + holeType.toString() + ".bmp", range);
+	rectangle(holeRaw, Rect(Point(size - 2, size-2), Point(size+2, size+2)), Scalar(0, 0, 255));
+	imwrite(path + holeName + "_raw" + ".bmp", holeRaw);
+	//imwrite(path + holeName + "_hsv" +   "_" + holeType.toString() + ".bmp", hsv);
+	//imwrite(path + holeName + "_gray" +  "_" + holeType.toString() + ".bmp", gray);
+	//imwrite(path + holeName + "_canny" + "_" + holeType.toString() + ".bmp", canny);
+	//imwrite(path + holeName + "_hough" + "_" + holeType.toString() + ".bmp", hough);
 
 	return holeType;
 }
