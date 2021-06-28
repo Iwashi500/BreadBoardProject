@@ -30,6 +30,7 @@
 #endif
 
 using namespace cv;
+using namespace std;
 
 // アプリケーションのバージョン情報に使われる CAboutDlg ダイアログ
 class CAboutDlg : public CDialogEx
@@ -85,6 +86,8 @@ CSampleDlg::CSampleDlg(CWnd* pParent /*=nullptr*/)
 	//LocalConfigクラスの作成が必要(Local設定ファイルのため.gitignore)
 	IWI_PATH = LocalConfig::saveBasePath();
 	RESULT_PATH = LocalConfig::saveResultPath();
+	breadBoard = BreadBoard();
+	fileIndex = 0;
 }
 
 //デストラクタ
@@ -139,6 +142,7 @@ BEGIN_MESSAGE_MAP(CSampleDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON14, &CSampleDlg::OnClosing)
 	ON_BN_CLICKED(IDC_BUTTON16, &CSampleDlg::OnCreateCutBoard)
 	ON_BN_CLICKED(IDC_BUTTON15, &CSampleDlg::OnHoukoku)
+	ON_BN_CLICKED(IDC_BUTTON17, &CSampleDlg::OnHoleDetection)
 END_MESSAGE_MAP()
 
 
@@ -651,74 +655,130 @@ void CSampleDlg::OnBack()
 }
 
 void CSampleDlg::drawBoardPoints() {
-	std::list<MyPoint> points;
-	MyPoint base(54, 20);
-	MyPoint add(8, 8);
+	//std::list<MyPoint> points;
+	//MyPoint base(54, 20);
+	//MyPoint add(8, 8);
 
-	for (int j = 0; j < 63; j++) {
-		OnLine onLine;
-		ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
-		for (int i = 0; i < 5; i++) {
-			int y = base.y + add.y * i;
-			int x = base.x + add.x * j;
-			MyPoint point(y, x);
-			m_Image->drawPoint(point, 3);
-			chain.pushNext(point);
-			onLine.push(chain);
-		}
-		breadBoard.push(onLine);
-	}
-
-	base.y = 110;
-	for (int j = 0; j < 63; j++) {
-		OnLine onLine;
-		ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
-		for (int i = 0; i < 5; i++) {
-			int y = base.y + add.y * i;
-			int x = base.x + add.x * j;
-			MyPoint point(y, x);
-			m_Image->drawPoint(point, 3);
-			chain.pushNext(point);
-			onLine.push(chain);
-		}
-		breadBoard.push(onLine);
-	}
-
-	for (OnLine onLine : breadBoard.getOnLines()) {
-		drawOnLine(onLine);
-	}
-
-	//base.y = 24;
-	//base.x = 36;
-	//for (int i = 0; i < 2; i++) {
-	//	for (int j = 0; j < 59; j++) {
+	//for (int j = 0; j < 63; j++) {
+	//	OnLine onLine;
+	//	ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
+	//	for (int i = 0; i < 5; i++) {
 	//		int y = base.y + add.y * i;
 	//		int x = base.x + add.x * j;
-	//		drawPoint(MyPoint(y, x), 3);
+	//		MyPoint point(y, x);
+	//		m_Image->drawPoint(point, 3);
+	//		chain.pushNext(point);
+	//		onLine.push(chain);
 	//	}
+	//	breadBoard.push(onLine);
 	//}
 
-	//base.y = 165;
-	//for (int i = 0; i < 2; i++) {
-	//	for (int j = 0; j < 59; j++) {
+	//base.y = 110;
+	//for (int j = 0; j < 63; j++) {
+	//	OnLine onLine;
+	//	ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
+	//	for (int i = 0; i < 5; i++) {
 	//		int y = base.y + add.y * i;
 	//		int x = base.x + add.x * j;
-	//		drawPoint(MyPoint(y, x), 3);
+	//		MyPoint point(y, x);
+	//		m_Image->drawPoint(point, 3);
+	//		chain.pushNext(point);
+	//		onLine.push(chain);
 	//	}
+	//	breadBoard.push(onLine);
 	//}
 
-	UpdateImage();
+	//for (OnLine onLine : breadBoard.getOnLines()) {
+	//	drawOnLine(onLine);
+	//}
+
+	////base.y = 24;
+	////base.x = 36;
+	////for (int i = 0; i < 2; i++) {
+	////	for (int j = 0; j < 59; j++) {
+	////		int y = base.y + add.y * i;
+	////		int x = base.x + add.x * j;
+	////		drawPoint(MyPoint(y, x), 3);
+	////	}
+	////}
+
+	////base.y = 165;
+	////for (int i = 0; i < 2; i++) {
+	////	for (int j = 0; j < 59; j++) {
+	////		int y = base.y + add.y * i;
+	////		int x = base.x + add.x * j;
+	////		drawPoint(MyPoint(y, x), 3);
+	////	}
+	////}
+
+	//UpdateImage();std::list<MyPoint> points;
+	//MyPoint base(54, 20);
+	//MyPoint add(8, 8);
+
+	//for (int j = 0; j < 63; j++) {
+	//	OnLine onLine;
+	//	ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
+	//	for (int i = 0; i < 5; i++) {
+	//		int y = base.y + add.y * i;
+	//		int x = base.x + add.x * j;
+	//		MyPoint point(y, x);
+	//		m_Image->drawPoint(point, 3);
+	//		chain.pushNext(point);
+	//		onLine.push(chain);
+	//	}
+	//	breadBoard.push(onLine);
+	//}
+
+	//base.y = 110;
+	//for (int j = 0; j < 63; j++) {
+	//	OnLine onLine;
+	//	ChainPoint chain(base, MyPoint(base.y, base.x + add.x * j));
+	//	for (int i = 0; i < 5; i++) {
+	//		int y = base.y + add.y * i;
+	//		int x = base.x + add.x * j;
+	//		MyPoint point(y, x);
+	//		m_Image->drawPoint(point, 3);
+	//		chain.pushNext(point);
+	//		onLine.push(chain);
+	//	}
+	//	breadBoard.push(onLine);
+	//}
+
+	//for (OnLine onLine : breadBoard.getOnLines()) {
+	//	drawOnLine(onLine);
+	//}
+
+	////base.y = 24;
+	////base.x = 36;
+	////for (int i = 0; i < 2; i++) {
+	////	for (int j = 0; j < 59; j++) {
+	////		int y = base.y + add.y * i;
+	////		int x = base.x + add.x * j;
+	////		drawPoint(MyPoint(y, x), 3);
+	////	}
+	////}
+
+	////base.y = 165;
+	////for (int i = 0; i < 2; i++) {
+	////	for (int j = 0; j < 59; j++) {
+	////		int y = base.y + add.y * i;
+	////		int x = base.x + add.x * j;
+	////		drawPoint(MyPoint(y, x), 3);
+	////	}
+	////}
+
+	//UpdateImage();
 }
 
 void CSampleDlg::OnTest()
 {	
-	//if (!videoCapture.isOpened())
-	//	if (!initCamera())
-	//		return;
-	//videoCapture.read(input);
+	if (!videoCapture.isOpened())
+		if (!initCamera())
+			return;
+	videoCapture.read(input);
 
-	String inputPath = RESULT_PATH + "input.bmp";
-	input = imread(inputPath, 1);
+	//String inputPath = RESULT_PATH + "input.bmp";
+	//input = imread(inputPath, 1);
 
 	Mat result;
 
@@ -814,30 +874,386 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", ++index) + "result.bmp", result);
 }
 
-void CSampleDlg::OnHoukoku()
+void CSampleDlg::OnHoleDetection()
 {
-	String inputPath2 = RESULT_PATH + "result3.bmp";
-	Mat	input2 = imread(inputPath2, 1);
-	String inputPath3 = RESULT_PATH + "result4.bmp";
-	Mat input3 = imread(inputPath3, 1);
+	//if (!videoCapture.isOpened())
+	//	if (!initCamera())
+	//		return;
+	//videoCapture.read(input);
+
+	String inputPath = RESULT_PATH + "input.bmp";
+	input = imread(inputPath, 1);
+
 	Mat result;
 
-	Mat diff, mask1, mask2, mask3;
-	absdiff(input2, input3, diff);
-	threshold(diff, mask1, 50, 255, THRESH_BINARY);
-	cvtColor(mask1, mask2, COLOR_BGR2GRAY);
-	threshold(mask2, mask3, 40, 255, THRESH_BINARY);
+	//HSV
+	Mat hsv;
+	cvtColor(input, hsv, CV_BGR2HSV);
+	Scalar sMin = Scalar(0, 0, 115);
+	Scalar sMax = Scalar(180, 20, 255);
+	Mat mask;
+	inRange(hsv, sMin, sMax, mask);
 
-	input2.copyTo(result, mask3);
+	//エッジ検出
+	Mat edge;
+	Canny(mask, edge, 200, 255);
+
+	//上下線の領域取得
+	Point minP, maxP;
+	Rect area;
+	getBoardRect(input, area);
+
+	//穴マスク画像生成
+	Mat holeMask(Size(input.cols, input.rows), CV_8UC3, Scalar(0));
+	rectangle(holeMask, area, Scalar(255, 255, 255), -1);
+
+	//収縮処理
+	Mat erosion;
+	morphologyEx(mask, erosion, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(2, 2)));
+	erosion = mask.clone();
+
+	//反転
+	Mat reverse;
+	cv::bitwise_not(erosion, reverse);
+
+	//Mat reverse;
+	//morphologyEx(mask, reverse, MORPH_DILATE, getStructuringElement(MORPH_RECT, Size(2, 2)));
+
+	//ラベリング
+	Mat labels, stats, centroids;
+	int nLab = connectedComponentsWithStats(reverse, labels, stats, centroids, 4, CV_32S);
+	Mat filLabels = labels.clone();
+	int borderMax = 300;
+	int borderMin = 50;
+	Mat filter;
+	reverse.copyTo(filter);
+	Mat output(labels.size(), labels.type());
+	Mat_<float> input_1b = Mat_<float>(labels);
+	Mat_<float> labels_1b = Mat_<float>(output);
+	int x = labels_1b.size().width;
+	int y = labels_1b.size().height;
+	for (int i = 0; i < y; ++i) {
+		for (int j = 0; j < x; ++j) {
+			float pixel = input_1b(i, j);
+			int* label = filLabels.ptr<int>(i, j);
+			int* param = stats.ptr<int>(*label);
+			int size = param[ConnectedComponentsTypes::CC_STAT_AREA];
+			if (*label != 0 && borderMin < size &&  size < borderMax)
+				pixel = 255;
+			else {
+				pixel = 0;
+				*label = 0;
+			}
+			filter.at<unsigned char>(i, j) = pixel;
+		}
+	}
+
+	//搭載穴の左上検出
+	Mat hole;
+	input.copyTo(hole, filter);
+	hole.copyTo(hole, holeMask);
+	Point leftTop(area.x, area.y);
+
+	//搭載穴の検出
+	Mat holeResult;
+	detectBoardHole(hole, holeResult, leftTop, filLabels, stats);
+
+	//結果画像生成
+	result = holeResult.clone();
+	rectangle(result, area, Scalar(255, 0, 0), 2);
+
+	//画像保存
 	imshow("result", result);
+	String path = RESULT_PATH;
+	imwrite(path + format("%d_", getFileIndex()) + "input.bmp", input);
+	imwrite(path + format("%d_", getFileIndex()) + "hsv.bmp", hsv);
+	imwrite(path + format("%d_", getFileIndex()) + "mask.bmp", mask);
+	imwrite(path + format("%d_", getFileIndex()) + "edge.bmp", edge);
+	imwrite(path + format("%d_", getFileIndex()) + "holeMask.bmp", holeMask);
+	imwrite(path + format("%d_", getFileIndex()) + "erosion.bmp", erosion);
+	imwrite(path + format("%d_", getFileIndex()) + "reverse.bmp", reverse);
+	imwrite(path + format("%d_", getFileIndex()) + "labels.bmp", labels);
+	imwrite(path + format("%d_", getFileIndex()) + "filLabels.bmp", filLabels);
+	imwrite(path + format("%d_", getFileIndex()) + "filter.bmp", filter);
+	imwrite(path + format("%d_", getFileIndex()) + "hole.bmp", hole);
+	imwrite(path + format("%d_", getFileIndex()) + "holeResult.bmp", holeResult);
+	imwrite(path + format("%d_", getFileIndex()) + "result.bmp", result);
+}
+
+void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labels, Mat status) {
+	result = input.clone();
+	
+	Mat resultColor = this->input.clone();
+
+	Point dis(80, 45);
+	Point hole(leftTop.x + dis.x, leftTop.y + dis.y);
+	Point leftHole = hole;
+	Point distance(30, 30);
+	int disAddX = 60;
+	Point disAddY(-11, 83);
+	Point disAddY2(15, 80);
+	int holeGapY = 87;
+	int i = 0;
+	int j = 0;
+
+	for (i = 0; i < 14; i++) {
+		std::vector<Point> positions;
+
+		//+-列の穴
+		if (i == 0 || i == 1 || i == 12 || i == 13) {
+			for (j = 0; j < 25; j++) {
+
+				if (hole.y < 0 || input.rows <= hole.y
+					|| hole.x < 0 || input.cols <= hole.x)
+					break;
+				
+				//穴があったら表示　+　補正
+				int* label = labels.ptr<int>(hole.y, hole.x);
+				if (*label != 0) {
+					int* param = status.ptr<int>(*label);
+					int x = param[ConnectedComponentsTypes::CC_STAT_LEFT];
+					int y = param[ConnectedComponentsTypes::CC_STAT_TOP];
+					int w = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
+					int h = param[ConnectedComponentsTypes::CC_STAT_HEIGHT];
+					hole = Point(x + w / 2, y + h / 2);
+
+					rectangle(result, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
+					rectangle(resultColor, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
+					//circle(result, hole, 2, Scalar(0, 0, 255), 1);
+
+					breadBoard.unusedHoles.push_back(Point(j, i));
+				}
+				else {
+					breadBoard.usedHoles.push_back(Point(j, i));
+				}
+
+				positions.push_back(hole);
+
+				if (j == 0) {
+					leftHole = hole;
+				}
+
+				if (j % 5 == 4) 
+					hole.x += disAddX;
+				else
+					hole.x += distance.x;
+			}
+		}
+		else {
+			for (j = 0; j < 30; j++) {
+				
+				if (hole.y < 0 || input.rows <= hole.y
+					|| hole.x < 0 || input.cols <= hole.x)
+					break;
+
+				//穴があったら表示　+　補正
+				int* label = labels.ptr<int>(hole.y, hole.x);
+				if (*label != 0) {
+					int* param = status.ptr<int>(*label);
+					int x = param[ConnectedComponentsTypes::CC_STAT_LEFT];
+					int y = param[ConnectedComponentsTypes::CC_STAT_TOP];
+					int w = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
+					int h = param[ConnectedComponentsTypes::CC_STAT_HEIGHT];
+					hole = Point(x + w / 2, y + h / 2);
+
+					rectangle(result, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
+					rectangle(resultColor, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
+					//circle(result, hole, 2, Scalar(0, 0, 255), 1);
+
+					breadBoard.unusedHoles.push_back(Point(j, i));
+				}
+				else {
+					breadBoard.usedHoles.push_back(Point(j, i));
+				}
+
+				positions.push_back(hole);
+
+				if (j == 0) {
+					leftHole = hole;
+				}
+
+				hole.x += distance.x;
+			}
+		}
+
+		hole = leftHole;
+		if (i == 1) {
+			hole.x += disAddY.x;
+			hole.y += disAddY.y;
+		}
+		else if (i == 11) {
+			hole.x += disAddY2.x;
+			hole.y += disAddY2.y;
+		}
+		else if (i == 6) {
+			hole.y += holeGapY;
+		}
+		else {
+			hole.y += distance.y;
+		}
+
+		breadBoard.holePositions.push_back(positions);
+	}
+
+	//使用している穴
+	i = 0;
+	for (auto itr = breadBoard.usedHoles.begin(); itr != breadBoard.usedHoles.end(); ++itr) {
+		Point position = *itr;
+		Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
+		int s = 4;
+		int x = usedHole.x - s;
+		int y = usedHole.y - s;
+		int w = usedHole.x + s;
+		int h = usedHole.y + s;
+
+		HoleType holeType = saveHole(position);
+		Scalar color;
+		if (holeType.type == HoleType::MIDDLE)
+			color = Scalar(255, 255, 0);
+		else if (holeType.type == HoleType::EDGE)
+			color = Scalar(0, 255, 255);
+		else if (holeType.type == HoleType::EMPTY)
+			color = Scalar(0, 255, 0);
+
+
+		rectangle(result, Rect(Point(x, y), Point(w, h)), color, 2);
+		rectangle(resultColor, Rect(Point(x, y), Point(w, h)), color, 2);
+	}
 
 	String path = RESULT_PATH;
-	int index = 0;
-	imwrite(path + format("%d_", ++index) + "diff.bmp", diff);
-	imwrite(path + format("%d_", ++index) + "mask1.bmp", mask1);
-	imwrite(path + format("%d_", ++index) + "mask2.bmp", mask2);
-	imwrite(path + format("%d_", ++index) + "mask3.bmp", mask3);
-	imwrite(path + format("%d_", ++index) + "result.bmp", result);
+	imwrite(path + format("%d_", getFileIndex()) + "resultColor.bmp", resultColor);
+}
+
+int CSampleDlg::getFileIndex() {
+	return ++fileIndex;
+}
+
+HoleType CSampleDlg::saveHole(Point position) {
+	Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
+	int size = 25;
+	int x = usedHole.x - size;
+	int y = usedHole.y - size;
+	int w = usedHole.x + size;
+	int h = usedHole.y + size;
+
+	Mat holeRaw = Mat(input, Rect(Point(x, y), Point(w, h))).clone();
+	String path = RESULT_PATH + "holes\\";
+	String holeName =  "hole_" + BreadBoard::getHoleName(position);
+	HoleType holeType;
+
+	Mat hsv, gray;
+	cvtColor(holeRaw, gray, CV_BGR2GRAY);
+	cvtColor(holeRaw, hsv, CV_BGR2HSV);
+	
+	unsigned char* color = hsv.ptr<unsigned char>(size, size);
+	unsigned char hsvValue[3] = { *(color + 2) , *(color + 1), *color };
+	unsigned char* kido = gray.ptr<unsigned char>(size, size);
+
+	//if (hsvValue[1] > 150)
+	//	holeType.type = HoleType::MIDDLE;
+	//else if (*kido < 50)
+	//	holeType.type = HoleType::MIDDLE;
+	//else if (*kido > 175)
+	//	holeType.type = HoleType::MIDDLE;
+	if (false)
+		printf("");
+	//端と判定されたらさらにラベリングで判定
+	else {
+
+		Mat range, range_rev;
+		Scalar sMin = Scalar(0, 0, 130);
+		Scalar sMax = Scalar(180, 50, 255);
+		inRange(hsv, sMin, sMax, range);
+		cv::bitwise_not(range, range_rev);
+
+
+		Mat labels, status, centroids;
+		connectedComponentsWithStats(range, labels, status, centroids, 4, CV_32S);
+
+		int* label = labels.ptr<int>(size, size);
+		if (*label == 0)
+			connectedComponentsWithStats(range_rev, labels, status, centroids, 4, CV_32S);
+		else
+			printf("");
+
+		int* param = status.ptr<int>(*label);
+		int left = param[ConnectedComponentsTypes::CC_STAT_LEFT];
+		int top = param[ConnectedComponentsTypes::CC_STAT_TOP];
+		int width = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
+		int height = param[ConnectedComponentsTypes::CC_STAT_HEIGHT];
+		int right = left + width;
+		int down = top + height;
+
+		if (width >= size * 2 || height >= size * 2)
+			holeType = HoleType::MIDDLE;
+		else {
+			int edgeCount = 0;
+			if (left == 0)
+				edgeCount++;
+			if (right == size * 2)
+				edgeCount++;
+			if (top == 0)
+				edgeCount++;
+			if (down == size * 2)
+				edgeCount++;
+
+			if (edgeCount >= 2)
+				holeType.type = HoleType::MIDDLE;
+			else if (edgeCount == 0) //どの端にも達していないなら搭載なしと再判定
+				holeType.type = HoleType::EMPTY;
+			else
+			holeType.type = HoleType::EDGE;
+		}
+
+		imwrite(path + holeName + "_range" + ".bmp", range);
+		imwrite(path + holeName + "_range_rev" + ".bmp", range_rev);
+		imwrite(path + holeName + "_labels" + ".bmp", labels);
+	}
+
+	//rectangle(holeRaw, Rect(Point(size - 2, size-2), Point(size+2, size+2)), Scalar(0, 0, 255));
+	imwrite(path + holeName + "_raw" + ".bmp", holeRaw);
+	//imwrite(path + holeName + "_hsv" +   "_" + holeType.toString() + ".bmp", hsv);
+	//imwrite(path + holeName + "_gray" +  "_" + holeType.toString() + ".bmp", gray);
+	//imwrite(path + holeName + "_canny" + "_" + holeType.toString() + ".bmp", canny);
+	//imwrite(path + holeName + "_hough" + "_" + holeType.toString() + ".bmp", hough);
+
+	return holeType;
+}
+
+void CSampleDlg::getBoardRect(const Mat input, Rect& area) {
+	//HSV
+	Mat hsv;
+	cvtColor(input, hsv, CV_BGR2HSV);
+	Scalar sMin = Scalar(0, 0, 120);
+	Scalar sMax = Scalar(180, 100, 255);
+	Mat mask;
+	inRange(hsv, sMin, sMax, mask);
+
+	//メディアンフィルタ
+	Mat median;
+	medianBlur(mask, median, 5);
+
+	//矩形探索
+	area = boundingRect(median);
+}
+
+void CSampleDlg::OnHoukoku()
+{
+	String inputPath = RESULT_PATH + "hole.png";
+	input = imread(inputPath, 1);
+
+	Mat gray;
+	Scalar sMin = Scalar(0, 0, 250);
+	Scalar sMax = Scalar(180, 100, 255);
+	cvtColor(input, gray, CV_BGR2HSV);
+	inRange(gray, sMin, sMax, gray);
+	cv::bitwise_not(gray, gray);
+
+	Mat labels, stats, centroids;
+	int nLab = connectedComponentsWithStats(gray, labels, stats, centroids, 4, CV_32S);
+
+	String path = RESULT_PATH;
+	imwrite(path + format("%d_", getFileIndex()) + "labels.bmp", labels);
 }
 
 void CSampleDlg::drawOnLine(OnLine line) {
@@ -1254,7 +1670,7 @@ bool CSampleDlg::initCamera() {
 void CSampleDlg::OnCameraStart()
 {
 	//initCamera();
-	m_timerID = SetTimer(1, 100, NULL);
+	m_timerID = SetTimer(1, 500, NULL);
 }
 
 void CSampleDlg::OnCameraStop()
@@ -1275,8 +1691,6 @@ void CSampleDlg::OnTimer(UINT_PTR nIDEvent)
 	{
 	case 1:
 		OnGetImage();
-		//OnChangeHSV();
-		baseDiff();
 		break;
 	default:
 		break;
