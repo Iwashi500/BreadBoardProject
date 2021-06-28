@@ -970,7 +970,7 @@ void CSampleDlg::OnHoleDetection()
 	imwrite(path + format("%d_", getFileIndex()) + "mask.bmp", mask);
 	imwrite(path + format("%d_", getFileIndex()) + "edge.bmp", edge);
 	imwrite(path + format("%d_", getFileIndex()) + "holeMask.bmp", holeMask);
-	//imwrite(path + format("%d_", getFileIndex()) + "erosion.bmp", erosion);
+	imwrite(path + format("%d_", getFileIndex()) + "erosion.bmp", erosion);
 	imwrite(path + format("%d_", getFileIndex()) + "reverse.bmp", reverse);
 	imwrite(path + format("%d_", getFileIndex()) + "labels.bmp", labels);
 	imwrite(path + format("%d_", getFileIndex()) + "filLabels.bmp", filLabels);
@@ -982,6 +982,9 @@ void CSampleDlg::OnHoleDetection()
 
 void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labels, Mat status) {
 	result = input.clone();
+	
+	Mat resultColor = this->input.clone();
+
 	Point dis(80, 45);
 	Point hole(leftTop.x + dis.x, leftTop.y + dis.y);
 	Point leftHole = hole;
@@ -1015,7 +1018,8 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 					hole = Point(x + w / 2, y + h / 2);
 
 					rectangle(result, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
-					circle(result, hole, 2, Scalar(0, 0, 255), 1);
+					rectangle(resultColor, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
+					//circle(result, hole, 2, Scalar(0, 0, 255), 1);
 
 					breadBoard.unusedHoles.push_back(Point(j, i));
 				}
@@ -1053,7 +1057,8 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 					hole = Point(x + w / 2, y + h / 2);
 
 					rectangle(result, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
-					circle(result, hole, 2, Scalar(0, 0, 255), 1);
+					rectangle(resultColor, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
+					//circle(result, hole, 2, Scalar(0, 0, 255), 1);
 
 					breadBoard.unusedHoles.push_back(Point(j, i));
 				}
@@ -1109,9 +1114,14 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 			color = Scalar(0, 255, 255);
 		else if (holeType.type == HoleType::EMPTY)
 			color = Scalar(0, 255, 0);
-		rectangle(result, Rect(Point(x, y), Point(w, h)), color, 2);
 
+
+		rectangle(result, Rect(Point(x, y), Point(w, h)), color, 2);
+		rectangle(resultColor, Rect(Point(x, y), Point(w, h)), color, 2);
 	}
+
+	String path = RESULT_PATH;
+	imwrite(path + format("%d_", getFileIndex()) + "resultColor.bmp", resultColor);
 }
 
 int CSampleDlg::getFileIndex() {
@@ -1189,6 +1199,8 @@ HoleType CSampleDlg::saveHole(Point position) {
 
 			if (edgeCount >= 2)
 				holeType.type = HoleType::MIDDLE;
+			else if (edgeCount == 0) //どの端にも達していないなら搭載なしと再判定
+				holeType.type = HoleType::EMPTY;
 			else
 			holeType.type = HoleType::EDGE;
 		}
@@ -1198,7 +1210,7 @@ HoleType CSampleDlg::saveHole(Point position) {
 		imwrite(path + holeName + "_labels" + ".bmp", labels);
 	}
 
-	rectangle(holeRaw, Rect(Point(size - 2, size-2), Point(size+2, size+2)), Scalar(0, 0, 255));
+	//rectangle(holeRaw, Rect(Point(size - 2, size-2), Point(size+2, size+2)), Scalar(0, 0, 255));
 	imwrite(path + holeName + "_raw" + ".bmp", holeRaw);
 	//imwrite(path + holeName + "_hsv" +   "_" + holeType.toString() + ".bmp", hsv);
 	//imwrite(path + holeName + "_gray" +  "_" + holeType.toString() + ".bmp", gray);
@@ -1227,28 +1239,21 @@ void CSampleDlg::getBoardRect(const Mat input, Rect& area) {
 
 void CSampleDlg::OnHoukoku()
 {
-	String inputPath2 = RESULT_PATH + "result3.bmp";
-	Mat	input2 = imread(inputPath2, 1);
-	String inputPath3 = RESULT_PATH + "result4.bmp";
-	Mat input3 = imread(inputPath3, 1);
-	Mat result;
+	String inputPath = RESULT_PATH + "hole.png";
+	input = imread(inputPath, 1);
 
-	Mat diff, mask1, mask2, mask3;
-	absdiff(input2, input3, diff);
-	threshold(diff, mask1, 50, 255, THRESH_BINARY);
-	cvtColor(mask1, mask2, COLOR_BGR2GRAY);
-	threshold(mask2, mask3, 40, 255, THRESH_BINARY);
+	Mat gray;
+	Scalar sMin = Scalar(0, 0, 250);
+	Scalar sMax = Scalar(180, 100, 255);
+	cvtColor(input, gray, CV_BGR2HSV);
+	inRange(gray, sMin, sMax, gray);
+	cv::bitwise_not(gray, gray);
 
-	input2.copyTo(result, mask3);
-	imshow("result", result);
+	Mat labels, stats, centroids;
+	int nLab = connectedComponentsWithStats(gray, labels, stats, centroids, 4, CV_32S);
 
 	String path = RESULT_PATH;
-	int index = 0;
-	imwrite(path + format("%d_", ++index) + "diff.bmp", diff);
-	imwrite(path + format("%d_", ++index) + "mask1.bmp", mask1);
-	imwrite(path + format("%d_", ++index) + "mask2.bmp", mask2);
-	imwrite(path + format("%d_", ++index) + "mask3.bmp", mask3);
-	imwrite(path + format("%d_", ++index) + "result.bmp", result);
+	imwrite(path + format("%d_", getFileIndex()) + "labels.bmp", labels);
 }
 
 void CSampleDlg::drawOnLine(OnLine line) {
