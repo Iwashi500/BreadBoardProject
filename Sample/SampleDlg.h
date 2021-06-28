@@ -9,9 +9,12 @@
 #include <list>
 #include "BreadBoard.h"
 #include <opencv2/opencv.hpp>
+#include "HoleType.h"
 #pragma once
 
 using namespace cv;
+using namespace std;
+//using namespace BreadBoard;
 
 // CSampleDlg ダイアログ
 class CSampleDlg : public CDialog
@@ -63,8 +66,7 @@ protected:
 	BreadBoard breadBoard;
 	const int WIDTH = 1280;
 	const int HEIGHT = 720;
-	//const int WIDTH = 1920;
-	//const int HEIGHT = 1080;
+	int fileIndex;
 
 public:
 	afx_msg void OnOpen();
@@ -100,4 +102,9 @@ public:
 	afx_msg void OnClosing();
 	afx_msg void OnCreateCutBoard();
 	afx_msg void OnHoukoku();
+	afx_msg void OnHoleDetection();
+	void getBoardRect(const Mat input, Rect& area);
+	void detectBoardHole(Mat input, Mat &result, Point leftTop, const Mat labels, const Mat status);
+	HoleType saveHole(Point position);
+	int getFileIndex();
 };

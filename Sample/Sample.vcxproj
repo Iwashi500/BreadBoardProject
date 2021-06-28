@@ -199,6 +199,7 @@
     <ClInclude Include="BreadBoard.h" />
     <ClInclude Include="ChainPoint.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="HoleType.h" />
     <ClInclude Include="Image.h" />
     <ClInclude Include="LocalConfig.h" />
     <ClInclude Include="MyPoint.h" />
@@ -212,6 +213,7 @@
   <ItemGroup>
     <ClCompile Include="BreadBoard.cpp" />
     <ClCompile Include="ChainPoint.cpp" />
+    <ClCompile Include="HoleType.cpp" />
     <ClCompile Include="Image.cpp" />
     <ClCompile Include="MyPoint.cpp" />
     <ClCompile Include="OnLine.cpp" />
