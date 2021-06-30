@@ -772,65 +772,55 @@ void CSampleDlg::drawBoardPoints() {
 
 void CSampleDlg::OnTest()
 {	
-	if (!videoCapture.isOpened())
-		if (!initCamera())
-			return;
-	videoCapture.read(input);
+	String path = RESULT_PATH;
+	//if (!videoCapture.isOpened())
+	//	if (!initCamera())
+	//		return;
+	//videoCapture.read(input);
 
-	//String inputPath = RESULT_PATH + "input.bmp";
-	//input = imread(inputPath, 1);
+	String inputPath = RESULT_PATH + "input.bmp";
+	input = imread(inputPath, 1);
 
 	Mat result;
 
 	//HSV
 	Mat hsv;
 	cvtColor(input, hsv, CV_BGR2HSV);
-	Scalar sMin = Scalar(0, 0, 120);
-	Scalar sMax = Scalar(180, 100, 255);
+	Scalar sMin = Scalar(0, 0, 115);
+	Scalar sMax = Scalar(180, 20, 255);
 	Mat mask;
 	inRange(hsv, sMin, sMax, mask);
-	
+
 	//エッジ検出
 	Mat edge;
 	Canny(mask, edge, 200, 255);
 
-	//射影変換(固定座標)
-	Mat pers, pers_edge;
-	std::vector<Point2f> src;
-	std::vector<Point2f> dst;
-	src.push_back(Point2f(84, 63));
-	src.push_back(Point2f(1056, 29));
-	src.push_back(Point2f(130, 709));
-	src.push_back(Point2f(1083, 630));
-	dst.push_back(Point2f(0, 0));
-	dst.push_back(Point2f(1279, 0));
-	dst.push_back(Point2f(0, 719));
-	dst.push_back(Point2f(1279, 719));
-	Mat h = getPerspectiveTransform(src, dst);
-	warpPerspective(edge, pers_edge, h, edge.size());
-	warpPerspective(input, pers, h, input.size());
+	//上下線の領域取得
+	Point minP, maxP;
+	Rect area;
+	getBoardRect(input, area);
 
-	//背景画像読み込み_(射影変換済み)
-	String basePath = IWI_PATH + "BaseBoard.bmp";
-	Mat base = imread(basePath, 1);
+	//穴マスク画像生成
+	Mat holeMask(Size(input.cols, input.rows), CV_8UC3, Scalar(0));
+	rectangle(holeMask, area, Scalar(255, 255, 255), -1);
 
-	//背景差分
-	Mat diff, niti;
-	absdiff(base, pers, diff);
-	threshold(diff, niti, 40, 255, THRESH_BINARY);
+	//収縮処理
+	Mat erosion;
+	morphologyEx(mask, erosion, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(2, 2)));
+	erosion = mask.clone();
 
-	//メディアンフィルタ
-	Mat median;
-	medianBlur(niti, median, 5);
-	cvtColor(median, median, COLOR_BGR2GRAY);
-	threshold(median, median, 0, 255, THRESH_BINARY);
+	//反転
+	Mat reverse;
+	cv::bitwise_not(erosion, reverse);
 
 	//ラベリング
 	Mat labels, stats, centroids;
-	int nLab = connectedComponentsWithStats(median, labels, stats, centroids, 8, CV_32S);
-	int border = 200;
+	int nLab = connectedComponentsWithStats(reverse, labels, stats, centroids, 4, CV_32S);
+	Mat filLabels = labels.clone();
+	int borderMax = 300;
+	int borderMin = 50;
 	Mat filter;
-	median.copyTo(filter);
+	reverse.copyTo(filter);
 	Mat output(labels.size(), labels.type());
 	Mat_<float> input_1b = Mat_<float>(labels);
 	Mat_<float> labels_1b = Mat_<float>(output);
@@ -839,39 +829,78 @@ void CSampleDlg::OnTest()
 	for (int i = 0; i < y; ++i) {
 		for (int j = 0; j < x; ++j) {
 			float pixel = input_1b(i, j);
-
-			int step = labels.step;
-			int elem = labels.elemSize();
-
-			int* label = labels.ptr<int>(i, j);
+			int* label = filLabels.ptr<int>(i, j);
 			int* param = stats.ptr<int>(*label);
 			int size = param[ConnectedComponentsTypes::CC_STAT_AREA];
-			if (*label != 0 && size > border)
+			if (*label != 0 && borderMin < size && size < borderMax)
 				pixel = 255;
-			else
+			else {
 				pixel = 0;
+				*label = 0;
+			}
 			filter.at<unsigned char>(i, j) = pixel;
 		}
 	}
 
+	//搭載穴の左上検出
+	Mat hole;
+	input.copyTo(hole, filter);
+	hole.copyTo(hole, holeMask);
+	Point leftTop(area.x, area.y);
+
+	//搭載穴の検出
+	Mat holeResult;
+	detectBoardHole(hole, holeResult, leftTop, filLabels, stats);
+
+	//部品の抜き出し
+	set<int> saveLabel;
+	for (auto itr = breadBoard.usedHoles.begin(); itr != breadBoard.usedHoles.end(); ++itr) {
+		Point position = *itr;
+		Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
+
+		int* label = labels.ptr<int>(usedHole.y, usedHole.x);
+		decltype(saveLabel)::iterator it = saveLabel.find(*label);
+		if (it == saveLabel.end()) {
+			saveLabel.insert(*label);
+
+			int* param = stats.ptr<int>(*label);
+			int top = param[ConnectedComponentsTypes::CC_STAT_TOP];
+			int left = param[ConnectedComponentsTypes::CC_STAT_LEFT];
+			int height = param[ConnectedComponentsTypes::CC_STAT_HEIGHT];
+			int width = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
+			int down = top + height;
+			int right = left + width;
+		
+			Mat parts = Mat(input, Rect(left, top, width, height)).clone();
+			String partsPath = path + "parts\\";
+			imwrite(partsPath + format("%d_", *label) + "parts.bmp", parts);
+		}		
+
+	}
+
+
 	//結果画像生成
-	pers.copyTo(result, filter);
+	Mat holeOnly, resultMask;
+	absdiff(hole, holeResult, holeOnly);
+	inRange(holeOnly, Scalar(0, 0, 0), Scalar(1, 1, 1), resultMask);
+	input.copyTo(result, resultMask);
+	result += holeOnly;
 
 	//画像保存
 	imshow("result", result);
-	String path = RESULT_PATH;
-	int index = 0;
-	imwrite(path + format("%d_", ++index) + "input.bmp", input);
-	imwrite(path + format("%d_", ++index) + "hsv.bmp", hsv);
-	imwrite(path + format("%d_", ++index) + "mask.bmp", mask);
-	imwrite(path + format("%d_", ++index) + "edge.bmp", edge);
-	imwrite(path + format("%d_", ++index) + "pers.bmp", pers);
-	imwrite(path + format("%d_", ++index) + "pers_edge.bmp", pers_edge);
-	imwrite(path + format("%d_", ++index) + "diff.bmp", diff);
-	imwrite(path + format("%d_", ++index) + "niti.bmp", niti);
-	imwrite(path + format("%d_", ++index) + "median.bmp", median);
-	imwrite(path + format("%d_", ++index) + "filter.bmp", filter);
-	imwrite(path + format("%d_", ++index) + "result.bmp", result);
+	imwrite(path + format("%d_", getFileIndex()) + "input.bmp", input);
+	imwrite(path + format("%d_", getFileIndex()) + "hsv.bmp", hsv);
+	imwrite(path + format("%d_", getFileIndex()) + "mask.bmp", mask);
+	imwrite(path + format("%d_", getFileIndex()) + "edge.bmp", edge);
+	imwrite(path + format("%d_", getFileIndex()) + "holeMask.bmp", holeMask);
+	imwrite(path + format("%d_", getFileIndex()) + "erosion.bmp", erosion);
+	imwrite(path + format("%d_", getFileIndex()) + "reverse.bmp", reverse);
+	imwrite(path + format("%d_", getFileIndex()) + "labels.bmp", labels);
+	imwrite(path + format("%d_", getFileIndex()) + "filLabels.bmp", filLabels);
+	imwrite(path + format("%d_", getFileIndex()) + "filter.bmp", filter);
+	imwrite(path + format("%d_", getFileIndex()) + "hole.bmp", hole);
+	imwrite(path + format("%d_", getFileIndex()) + "holeResult.bmp", holeResult);
+	imwrite(path + format("%d_", getFileIndex()) + "result.bmp", result);
 }
 
 void CSampleDlg::OnHoleDetection()
@@ -982,9 +1011,6 @@ void CSampleDlg::OnHoleDetection()
 
 void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labels, Mat status) {
 	result = input.clone();
-	
-	Mat resultColor = this->input.clone();
-
 	Point dis(80, 45);
 	Point hole(leftTop.x + dis.x, leftTop.y + dis.y);
 	Point leftHole = hole;
@@ -1018,7 +1044,6 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 					hole = Point(x + w / 2, y + h / 2);
 
 					rectangle(result, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
-					rectangle(resultColor, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
 					//circle(result, hole, 2, Scalar(0, 0, 255), 1);
 
 					breadBoard.unusedHoles.push_back(Point(j, i));
@@ -1057,7 +1082,6 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 					hole = Point(x + w / 2, y + h / 2);
 
 					rectangle(result, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
-					rectangle(resultColor, Rect(Point(x, y), Point(x + w, y + h)), Scalar(0, 255, 0), 2);
 					//circle(result, hole, 2, Scalar(0, 0, 255), 1);
 
 					breadBoard.unusedHoles.push_back(Point(j, i));
@@ -1117,11 +1141,7 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 
 
 		rectangle(result, Rect(Point(x, y), Point(w, h)), color, 2);
-		rectangle(resultColor, Rect(Point(x, y), Point(w, h)), color, 2);
 	}
-
-	String path = RESULT_PATH;
-	imwrite(path + format("%d_", getFileIndex()) + "resultColor.bmp", resultColor);
 }
 
 int CSampleDlg::getFileIndex() {
