@@ -770,16 +770,27 @@ void CSampleDlg::drawBoardPoints() {
 	//UpdateImage();
 }
 
+void CSampleDlg::initSystem() {
+	resetFileIndex();
+	breadBoard = BreadBoard();
+	cv::destroyAllWindows();
+}
+
 void CSampleDlg::OnTest()
 {	
+	initSystem();
 	String path = RESULT_PATH;
-	//if (!videoCapture.isOpened())
-	//	if (!initCamera())
-	//		return;
-	//videoCapture.read(input);
+	if (!videoCapture.isOpened())
+		initCamera();
+	videoCapture.read(input);
 
-	String inputPath = RESULT_PATH + "input.bmp";
-	input = imread(inputPath, 1);
+	if (input.size == 0) {
+		String inputPath = RESULT_PATH + "input.bmp";
+		input = imread(inputPath, 1);
+	
+		if (input.size == 0)
+			return;
+	}
 
 	Mat result;
 
@@ -806,7 +817,7 @@ void CSampleDlg::OnTest()
 
 	//収縮処理
 	Mat erosion;
-	morphologyEx(mask, erosion, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(2, 2)));
+	morphologyEx(mask, erosion, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(3, 3)));
 	erosion = mask.clone();
 
 	//反転
@@ -852,36 +863,18 @@ void CSampleDlg::OnTest()
 	Mat holeResult;
 	detectBoardHole(hole, holeResult, leftTop, filLabels, stats);
 
+	//搭載穴の判別
+	Mat holeTypeResult;
+	judgeHoleType(holeResult, holeTypeResult);
+
 	//部品の抜き出し
-	set<int> saveLabel;
-	for (auto itr = breadBoard.usedHoles.begin(); itr != breadBoard.usedHoles.end(); ++itr) {
-		Point position = *itr;
-		Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
-
-		int* label = labels.ptr<int>(usedHole.y, usedHole.x);
-		decltype(saveLabel)::iterator it = saveLabel.find(*label);
-		if (it == saveLabel.end()) {
-			saveLabel.insert(*label);
-
-			int* param = stats.ptr<int>(*label);
-			int top = param[ConnectedComponentsTypes::CC_STAT_TOP];
-			int left = param[ConnectedComponentsTypes::CC_STAT_LEFT];
-			int height = param[ConnectedComponentsTypes::CC_STAT_HEIGHT];
-			int width = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
-			int down = top + height;
-			int right = left + width;
-		
-			Mat parts = Mat(input, Rect(left, top, width, height)).clone();
-			String partsPath = path + "parts\\";
-			imwrite(partsPath + format("%d_", *label) + "parts.bmp", parts);
-		}		
-
-	}
+	Mat parts;
+	cutParts(input, parts, reverse, labels, stats);
 
 
 	//結果画像生成
 	Mat holeOnly, resultMask;
-	absdiff(hole, holeResult, holeOnly);
+	absdiff(hole, holeTypeResult, holeOnly);
 	inRange(holeOnly, Scalar(0, 0, 0), Scalar(1, 1, 1), resultMask);
 	input.copyTo(result, resultMask);
 	result += holeOnly;
@@ -900,7 +893,115 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", getFileIndex()) + "filter.bmp", filter);
 	imwrite(path + format("%d_", getFileIndex()) + "hole.bmp", hole);
 	imwrite(path + format("%d_", getFileIndex()) + "holeResult.bmp", holeResult);
+	imwrite(path + format("%d_", getFileIndex()) + "holeTypeResult.bmp", holeTypeResult);
 	imwrite(path + format("%d_", getFileIndex()) + "result.bmp", result);
+}
+
+void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat status) {
+	String partsPath = RESULT_PATH + "parts\\";
+	
+	set<int> saveLabel;
+	for (auto itr = breadBoard.usedHoles.begin(); itr != breadBoard.usedHoles.end(); ++itr) {
+		Point position = *itr;
+		Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
+
+		int* label = labels.ptr<int>(usedHole.y, usedHole.x);
+		decltype(saveLabel)::iterator it = saveLabel.find(*label);
+		if (it == saveLabel.end()) {
+			saveLabel.insert(*label);
+			int partSize = 0;
+
+			int* param = status.ptr<int>(*label);
+			int top = param[ConnectedComponentsTypes::CC_STAT_TOP];
+			int left = param[ConnectedComponentsTypes::CC_STAT_LEFT];
+			int height = param[ConnectedComponentsTypes::CC_STAT_HEIGHT];
+			int width = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
+			int down = top + height;
+			int right = left + width;
+			Rect position = Rect(left, top, width, height);
+
+			Mat partRaw = Mat(input, position).clone();
+			Mat partMask = Mat(mask, position).clone();
+			Mat partPosition = input.clone();
+			Mat partCut;
+			partRaw.copyTo(partCut, partMask);
+			Mat partHSV;
+			cvtColor(partRaw, partHSV, CV_RGB2HSV);
+
+			//入力画像にパーツの場所を示す
+			rectangle(partPosition, position, Scalar(0, 0, 255), 2);
+
+			//ラベルで切り抜き
+			for (int i = 0; i < height; i++) {
+				for (int j = 0; j < width; j++) {
+					int* ptr = partCut.ptr<int>(i, j);
+					if (*ptr == 0)
+						continue;
+
+					int y = top + i;
+					int x = left + j;
+					int* l = labels.ptr<int>(y, x);
+					if (*l != *label) {
+						*ptr = 0;
+						*(ptr + 1) = 0;
+						*(ptr + 2) = 0;
+					}
+					else
+						partSize++;
+
+				}
+			}
+
+			//パーツ種類判定
+			String type = judgePartsType(partCut, partSize);
+
+			//パーツ登録
+			Part part = Part(partRaw.clone(), position, partSize);
+			breadBoard.parts.push_back(part);
+
+			//画像保存
+			imwrite(partsPath + format("%d_", *label) + type + "_raw.bmp", partRaw);
+			imwrite(partsPath + format("%d_", *label) + type + "_mask.bmp", partMask);
+			imwrite(partsPath + format("%d_", *label) + type + "_position.bmp", partPosition);
+			imwrite(partsPath + format("%d_", *label) + type + "_cut.bmp", partCut);
+			imwrite(partsPath + format("%d_", *label) + type + "_hsv.bmp", partHSV);
+		}
+
+	}
+}
+
+String CSampleDlg::judgePartsType(Mat input, int size) {
+	Mat hsv;
+	cvtColor(input, hsv, CV_RGB2HSV);
+	String result = "resistor";
+
+	for (int r = 0; r < 36; r++) {
+		int range = r * 5;
+		Scalar hmin = Scalar(range, 1, 1);
+		Scalar hmax = Scalar(range + 10, 255, 255);
+		Mat mask;
+		inRange(hsv, hmin, hmax, mask);
+
+		int count = 0;
+		for (int i = 0; i < input.rows; i++) {
+			for (int j = 0; j < input.cols; j++) {
+				int* inputPtr = input.ptr<int>(i, j);
+				if (*inputPtr != 0) {
+					int* maskPtr = mask.ptr<int>(i, j);
+					if (*maskPtr != 0)
+						count++;
+				}
+			}
+		}
+
+		float ratio = 0.8;
+		if (count >= size * ratio) {
+			result = "wire";
+			break;
+		}
+	}
+
+	return result;
 }
 
 void CSampleDlg::OnHoleDetection()
@@ -987,6 +1088,10 @@ void CSampleDlg::OnHoleDetection()
 	Mat holeResult;
 	detectBoardHole(hole, holeResult, leftTop, filLabels, stats);
 
+	//搭載穴の判別
+	Mat holeTypeResult;
+	judgeHoleType(holeTypeResult, holeTypeResult);
+
 	//結果画像生成
 	result = holeResult.clone();
 	rectangle(result, area, Scalar(255, 0, 0), 2);
@@ -1006,6 +1111,7 @@ void CSampleDlg::OnHoleDetection()
 	imwrite(path + format("%d_", getFileIndex()) + "filter.bmp", filter);
 	imwrite(path + format("%d_", getFileIndex()) + "hole.bmp", hole);
 	imwrite(path + format("%d_", getFileIndex()) + "holeResult.bmp", holeResult);
+	imwrite(path + format("%d_", getFileIndex()) + "holeTypeResult.bmp", holeTypeResult);
 	imwrite(path + format("%d_", getFileIndex()) + "result.bmp", result);
 }
 
@@ -1118,17 +1224,26 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 
 		breadBoard.holePositions.push_back(positions);
 	}
+}
 
+void CSampleDlg::judgeHoleType(Mat input, Mat& result) {
+	result = input.clone();
 	//使用している穴
-	i = 0;
 	for (auto itr = breadBoard.usedHoles.begin(); itr != breadBoard.usedHoles.end(); ++itr) {
 		Point position = *itr;
 		Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
 		int s = 4;
-		int x = usedHole.x - s;
-		int y = usedHole.y - s;
-		int w = usedHole.x + s;
-		int h = usedHole.y + s;
+		int left = usedHole.x - s;
+		int top = usedHole.y - s;
+		int right = usedHole.x + s;
+		int down = usedHole.y + s;
+
+		//if (left < 0) left = 0;
+		//if (top < 0) top = 0;
+		//if (right >= result.cols) 
+		//	right = result.cols - 1;
+		//if (down >= result.rows) 
+		//	down = result.rows - 1;
 
 		HoleType holeType = saveHole(position);
 		Scalar color;
@@ -1140,12 +1255,8 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 			color = Scalar(0, 255, 0);
 
 
-		rectangle(result, Rect(Point(x, y), Point(w, h)), color, 2);
+		rectangle(result, Rect(left, top,s * 2, s * 2), color, 2);
 	}
-}
-
-int CSampleDlg::getFileIndex() {
-	return ++fileIndex;
 }
 
 HoleType CSampleDlg::saveHole(Point position) {

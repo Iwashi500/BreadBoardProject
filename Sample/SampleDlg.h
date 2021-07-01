@@ -14,7 +14,6 @@
 
 using namespace cv;
 using namespace std;
-//using namespace BreadBoard;
 
 // CSampleDlg ダイアログ
 class CSampleDlg : public CDialog
@@ -105,6 +104,11 @@ public:
 	afx_msg void OnHoleDetection();
 	void getBoardRect(const Mat input, Rect& area);
 	void detectBoardHole(Mat input, Mat &result, Point leftTop, const Mat labels, const Mat status);
+	void judgeHoleType(Mat input, Mat& result);
 	HoleType saveHole(Point position);
-	int getFileIndex();
+	int getFileIndex() { return ++fileIndex;}
+	void resetFileIndex() { fileIndex = 0; }
+	void cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat status);
+	void initSystem();
+	String judgePartsType(Mat input, int size);
 };

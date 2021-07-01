@@ -3,6 +3,7 @@
 #include "MyPoint.h"
 #include "ChainPoint.h"
 #include "OnLine.h"
+#include "Part.h"
 #include <opencv2/opencv.hpp>
 
 using namespace std;
@@ -13,6 +14,7 @@ public:
 	vector<Point> usedHoles;
 	vector<Point> unusedHoles;
 	vector<vector<Point>> holePositions;
+	vector<Part> parts;
 
 	static String getHoleName(Point position);
 
