@@ -18,6 +18,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/imgproc/types_c.h>
+#include <atlpath.h> // CPathのため必要
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -776,15 +777,57 @@ void CSampleDlg::initSystem() {
 	cv::destroyAllWindows();
 }
 
+bool deleteFileInDirectory(CString directoryPath) {
+	// 対象のディレクトリ
+	CFileFind find;
+	CPath searchPath(directoryPath);
+	searchPath.Append(_T("*"));
+
+	// 対象のディレクトリがない場合、終了します。
+	if (!find.FindFile(searchPath, 0)) return TRUE;
+
+	// 対象のディレクトリ内のファイルまたはディレクトリが存在する間繰り返します。
+	BOOL result = FALSE;
+	do
+	{
+		// ディレクトリ内のファイルまたはディレクトリを取得します。
+		result = find.FindNextFile();
+
+		// "."または".."の場合、次を処理します。
+		if (find.IsDots()) continue;
+
+		// 対象のパスを取得します。
+		CPath targetPath(directoryPath);
+		targetPath.Append(find.GetFileName());
+
+		// 対象のパスがディレクトリの場合、ディレクトリ内を再帰的に処理します。
+		if (find.IsDirectory()) deleteFileInDirectory(targetPath);
+
+		// 対象のパスがファイルの場合、削除します。
+		else ::DeleteFile(targetPath);
+	} while (result);
+	find.Close();
+
+	return true;
+}
+
+void CSampleDlg::deleteResultFile() {
+	CString path = RESULT_PATH;
+
+	deleteFileInDirectory(path + "holes");
+	deleteFileInDirectory(path + "parts");
+}
+
 void CSampleDlg::OnTest()
 {	
+	deleteResultFile();
 	initSystem();
 	String path = RESULT_PATH;
-	if (!videoCapture.isOpened())
-		initCamera();
-	videoCapture.read(input);
 
-	if (input.size == 0) {
+	//if (!videoCapture.isOpened())
+	//	initCamera();
+	//videoCapture.read(input);
+	if (input.empty()) {
 		String inputPath = RESULT_PATH + "input.bmp";
 		input = imread(inputPath, 1);
 	

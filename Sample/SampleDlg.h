@@ -111,4 +111,5 @@ public:
 	void cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat status);
 	void initSystem();
 	String judgePartsType(Mat input, int size);
+	void deleteResultFile();
 };
