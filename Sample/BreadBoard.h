@@ -18,6 +18,10 @@ public:
 
 	static String getHoleName(Point position);
 
+	bool checkUsed(int y, int x);
+	bool checkUsed(Point position);
+	vector<Point>::iterator deleteUsedHole(Point hole);
+
 
 	/*void push(OnLine onLine) {
 		onLines.push_back(onLine);

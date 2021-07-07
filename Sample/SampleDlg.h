@@ -101,7 +101,6 @@ public:
 	afx_msg void OnClosing();
 	afx_msg void OnCreateCutBoard();
 	afx_msg void OnHoukoku();
-	afx_msg void OnHoleDetection();
 	void getBoardRect(const Mat input, Rect& area);
 	void detectBoardHole(Mat input, Mat &result, Point leftTop, const Mat labels, const Mat status);
 	void judgeHoleType(Mat input, Mat& result);
@@ -112,4 +111,6 @@ public:
 	void initSystem();
 	String judgePartsType(Mat input, int size);
 	void deleteResultFile();
+	bool checkHoleUsed(Point& hole, Mat& result, Mat labels, Mat status);
+	void reCheckHoleUsed(Mat& result, Mat labels, Mat status);
 };

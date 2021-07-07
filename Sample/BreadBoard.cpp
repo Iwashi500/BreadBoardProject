@@ -56,6 +56,29 @@ String BreadBoard::getHoleName(Point position) {
 	return xName + "-" + yName;
 }
 
+bool BreadBoard::checkUsed(int y, int x) {
+	return this->checkUsed(Point(x, y));
+}
+
+bool BreadBoard::checkUsed(Point position) {
+	if (position.y < 0 || position.x < 0 || position.y > 13 || position.x > 29)
+		return false;
+	else if ((position.y <= 1 || 12 <= position.y) && (position.x > 25))
+		return false;
+
+	return find(usedHoles.begin(), usedHoles.end(), position) != usedHoles.end();
+}
+
+vector<Point>::iterator BreadBoard::deleteUsedHole(Point hole) {
+	auto ite = find(usedHoles.begin(), usedHoles.end(), hole);
+
+	if (ite != usedHoles.end()) {
+		return usedHoles.erase(ite);
+	}
+	else
+		return ite;
+}
+
 //OnLine BreadBoard::getOnLine(MyPoint point) {
 //	for (OnLine onLine : onLines) {
 //		std::list<MyPoint> points = onLine.getPoints();
