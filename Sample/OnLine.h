@@ -1,13 +1,13 @@
 #pragma once
-#include "ChainPoint.h"
+#include "Connection.h"
 #include <list>
 
 class OnLine {
 private:
-	std::list<ChainPoint> chains;
-	std::list<MyPoint> points;
+	//std::list<Connection> chains;
+	//std::list<MyPoint> points;
 public:
-	void push(ChainPoint chain) {
+	/*void push(Connection chain) {
 		if (chain.point1 == chain.point2)
 			return;
 
@@ -25,13 +25,13 @@ public:
 		}
 	}
 
-	std::list<ChainPoint> getChains() {
+	std::list<Connection> getChains() {
 		return chains;
 	}
 
 	std::list<MyPoint> getPoints() {
 		return points;
-	}
+	}*/
 
 
 };

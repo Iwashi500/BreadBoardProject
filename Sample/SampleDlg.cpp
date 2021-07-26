@@ -30,6 +30,13 @@
 #define new DEBUG_NEW
 #endif
 
+//色
+#define BLUE Scalar(255, 0, 0)
+#define GREEN Scalar(0, 255, 0)
+#define RED Scalar(0, 0, 255)
+#define YELLOW Scalar(0, 255, 255)
+#define WHITE Scalar(255, 255, 255)
+
 using namespace cv;
 using namespace std;
 
@@ -817,6 +824,33 @@ void CSampleDlg::deleteResultFile() {
 	deleteFileInDirectory(path + "parts");
 }
 
+void CSampleDlg::drawHoleType(Mat& result) {
+	for (int i = 0; i < 14; i++) {
+		int row = 30;
+		if (i < 2 || 11 < i)
+			row = 25;
+		for (int j = 0; j < row; j++) {
+			Point hole = breadBoard.holePositions.at(i).at(j);
+			int s = 10 * 1.5;
+			int left = hole.x - s;
+			int top = hole.y - s;
+			int right = hole.x + s;
+			int down = hole.y + s;
+
+			HoleType type = breadBoard.holeTypes.at(i).at(j);
+			Scalar color;
+			if (type.type == HoleType::MIDDLE)
+				color = Scalar(255, 255, 0);
+			else if (type.type == HoleType::EDGE)
+				color = Scalar(0, 255, 255);
+			else if (type.type == HoleType::EMPTY) 
+				color = Scalar(0, 255, 0);
+
+			rectangle(result, Rect(left, top, s * 2, s * 2), color, 2);	
+		}
+	}
+}
+
 void CSampleDlg::OnTest()
 {	
 	deleteResultFile();
@@ -870,8 +904,8 @@ void CSampleDlg::OnTest()
 	Mat labels, stats, centroids;
 	int nLab = connectedComponentsWithStats(reverse, labels, stats, centroids, 4, CV_32S);
 	Mat filLabels = labels.clone();
-	int borderMax = 300;
-	int borderMin = 50;
+	int borderMax = 300 * 1.5;
+	int borderMin = 50 * 1.5;
 	Mat filter;
 	reverse.copyTo(filter);
 	Mat output(labels.size(), labels.type());
@@ -909,10 +943,24 @@ void CSampleDlg::OnTest()
 	Mat holeTypeResult;
 	judgeHoleType(holeResult, holeTypeResult);
 
+
+	breadBoard.usedHoles.push_back(Point(7, 7));
+	breadBoard.holeTypes.at(7).at(7) = HoleType::EDGE;
+
+
+
+	//穴の状態の画像生成
+	Mat resultType = input.clone();
+	drawHoleType(resultType);
+
 	//部品の抜き出し
 	Mat parts;
 	cutParts(input, parts, reverse, labels, stats);
 
+	//配線検出
+	Mat lineConnect = input.clone();
+	detectLineConnect();
+	drawLineConnet(lineConnect);
 
 	//結果画像生成
 	Mat holeOnly, resultMask;
@@ -921,8 +969,11 @@ void CSampleDlg::OnTest()
 	input.copyTo(result, resultMask);
 	result += holeOnly;
 
+	Mat showResult;
+	resize(lineConnect, showResult, Size(), 0.5, 0.5);
+
 	//画像保存
-	imshow("result", result);
+	imshow("result", showResult);
 	imwrite(path + format("%d_", getFileIndex()) + "input.bmp", input);
 	imwrite(path + format("%d_", getFileIndex()) + "hsv.bmp", hsv);
 	imwrite(path + format("%d_", getFileIndex()) + "mask.bmp", mask);
@@ -936,18 +987,111 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", getFileIndex()) + "hole.bmp", hole);
 	imwrite(path + format("%d_", getFileIndex()) + "holeResult.bmp", holeResult);
 	imwrite(path + format("%d_", getFileIndex()) + "holeTypeResult.bmp", holeTypeResult);
+	imwrite(path + format("%d_", getFileIndex()) + "resultType.bmp", resultType);
+	imwrite(path + format("%d_", getFileIndex()) + "lineConnect.bmp", lineConnect);
 	imwrite(path + format("%d_", getFileIndex()) + "result.bmp", result);
+}
+
+void CSampleDlg::createTestBoard() {
+	//初期化
+	//breadBoard.unusedHoles.clear();
+	//breadBoard.usedHoles.clear();
+
+	//for (int i = 0; i < 14; i++) {
+	//	int col = 30;
+	//	if (i <= 1 || 12 <= i)
+	//		col = 25;
+	//	
+	//	for (int j = 0; j < col; j++) {
+	//		breadBoard.unusedHoles.push_back(Point(i, j));
+	//	}
+	//}
+}
+
+void CSampleDlg::drawLineConnet(Mat& result) {
+	for (auto connect : breadBoard.connections) {
+		Point hole1 = breadBoard.getHolePosition(connect.point1);
+		Point hole2 = breadBoard.getHolePosition(connect.point2);
+		Scalar color;
+		if (connect.type == "wire")
+			color = GREEN;
+		else if (connect.type == "resistor")
+			color = YELLOW;
+		else
+			color = RED;
+
+		line(result, hole1, hole2, color, 3);
+		circle(result, hole1, 10, GREEN, -1);
+		circle(result, hole2, 10, GREEN, -1);
+	}
+}
+
+void CSampleDlg::detectLineConnect() {
+	//まずは縦列
+	for (auto position : breadBoard.usedHoles) {
+		Point hole = breadBoard.holePositions.at(position.y).at(position.x);
+		HoleType holeType = breadBoard.holeTypes.at(position.y).at(position.x);
+
+		//+-エリアなら無視
+		if (position.y < 2 || 11 < position.y)
+			continue;
+
+		//端のみつなげる
+		if (holeType.type == HoleType::EDGE) {
+			for (int i = 1; i < 5; i++) {
+				int nextY = position.y + i;
+				//分断部分で終わる
+				if (nextY == 7 || nextY == 12)
+					break;
+
+				HoleType nextHoleType = breadBoard.holeTypes.at(nextY).at(position.x);
+				if (nextHoleType.type == HoleType::EDGE) {
+					Point nextHole = breadBoard.holePositions.at(nextY).at(position.x);
+					Point nextPosition = Point(position.x, position.y + i);
+					breadBoard.connections.push_back(Connection(position, nextPosition, "wire"));
+					break;
+				}
+			}
+		}
+	}
+
+	//次にパーツ毎
+	for (auto part : breadBoard.parts) {
+		if (part.type == "wire" || part.type == "resistor") {
+			vector<Point> edges;
+			//端の穴をすべて取得
+			for (auto position : part.holes) {
+				HoleType holeType = breadBoard.getHoleType(position);
+				if (holeType.type == HoleType::EDGE)
+					edges.push_back(position);
+			}
+			if (edges.size() <= 1)
+				continue;
+
+			//端の穴をすべてつなげる
+			for (int i = 0; i < edges.size() - 1; i++) {
+				for (int j = i + 1; j < edges.size(); j++) {
+					breadBoard.connections.push_back(Connection(edges.at(i), edges.at(j), part.type));
+				}
+			}
+		}
+	}
 }
 
 void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat status) {
 	String partsPath = RESULT_PATH + "parts\\";
 	
 	set<int> saveLabel;
+	map<int, int>labelIndex;
+	int index = 0;
 	for (auto itr = breadBoard.usedHoles.begin(); itr != breadBoard.usedHoles.end(); ++itr) {
 		Point position = *itr;
 		Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
 
 		int* label = labels.ptr<int>(usedHole.y, usedHole.x);
+		if (*label == 0)
+			continue;
+
 		decltype(saveLabel)::iterator it = saveLabel.find(*label);
 		if (it == saveLabel.end()) {
 			saveLabel.insert(*label);
@@ -960,10 +1104,10 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 			int width = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
 			int down = top + height;
 			int right = left + width;
-			Rect position = Rect(left, top, width, height);
+			Rect area = Rect(left, top, width, height);
 
-			Mat partRaw = Mat(input, position).clone();
-			Mat partMask = Mat(mask, position).clone();
+			Mat partRaw = Mat(input, area).clone();
+			Mat partMask = Mat(mask, area).clone();
 			Mat partPosition = input.clone();
 			Mat partCut;
 			partRaw.copyTo(partCut, partMask);
@@ -971,7 +1115,7 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 			cvtColor(partRaw, partHSV, CV_RGB2HSV);
 
 			//入力画像にパーツの場所を示す
-			rectangle(partPosition, position, Scalar(0, 0, 255), 2);
+			rectangle(partPosition, area, Scalar(0, 0, 255), 2);
 
 			//ラベルで切り抜き
 			for (int i = 0; i < height; i++) {
@@ -998,8 +1142,11 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 			String type = judgePartsType(partCut, partSize);
 
 			//パーツ登録
-			Part part = Part(partRaw.clone(), position, partSize);
+			Part part = Part(partRaw.clone(), area, partSize, type);
+			part.addHole(position);
 			breadBoard.parts.push_back(part);
+			labelIndex[*label] = index;
+			index++;
 
 			//画像保存
 			imwrite(partsPath + format("%d_", *label) + type + "_raw.bmp", partRaw);
@@ -1007,6 +1154,11 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 			imwrite(partsPath + format("%d_", *label) + type + "_position.bmp", partPosition);
 			imwrite(partsPath + format("%d_", *label) + type + "_cut.bmp", partCut);
 			imwrite(partsPath + format("%d_", *label) + type + "_hsv.bmp", partHSV);
+		}
+		//すでにPartsを登録済み
+		else {
+			int partIndex = labelIndex[*label];
+			breadBoard.parts.at(partIndex).addHole(position);
 		}
 
 	}
@@ -1053,14 +1205,15 @@ String CSampleDlg::judgePartsType(Mat input, int size) {
 /// <param name="labels">ラベル情報</param>
 /// <param name="status">ラベリングのステータス情報</param>
 /// <returns>
-///		使用している:true
-///		使用していない:false
+///		使用:true
+///		未使用:false
 /// </returns>
 bool CSampleDlg::checkHoleUsed(Point& hole, Mat& result, Mat labels, Mat status) {
 	//穴があったら表示　+　補正
 	int* label = labels.ptr<int>(hole.y, hole.x);
 	if (*label != 0) {
 		int* param = status.ptr<int>(*label);
+
 		int x = param[ConnectedComponentsTypes::CC_STAT_LEFT];
 		int y = param[ConnectedComponentsTypes::CC_STAT_TOP];
 		int w = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
@@ -1142,19 +1295,21 @@ bool CSampleDlg::checkHoleUsed(Point& hole, Mat& result, Mat labels, Mat status)
 
 void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labels, Mat status) {
 	result = input.clone();
-	Point dis(80, 45);
-	Point hole(leftTop.x + dis.x, leftTop.y + dis.y);
+	Point DIS_BOARD_TO_HOLE(80 * 1.5, 45 * 1.5);
+	Point DIS_NEXT_HOLE(30 * 1.5, 30 * 1.5);
+	int DIS_NEXT_LONG_X = 60 * 1.5;
+	Point DIS_PLUS_TO_J(-11 * 1.5, 83 * 1.5);
+	Point DIS_A_TO_MINUS(15 * 1.5, 83 * 1.5);
+	int DIS_F_TO_E = 87 * 1.5;
+
+	Point hole(leftTop.x + DIS_BOARD_TO_HOLE.x, leftTop.y + DIS_BOARD_TO_HOLE.y);
 	Point leftHole = hole;
-	Point distance(30, 30);
-	int disAddX = 60;
-	Point disAddY(-11, 83);
-	Point disAddY2(15, 80);
-	int holeGapY = 87;
 	int i = 0;
 	int j = 0;
 
 	for (i = 0; i < 14; i++) {
 		std::vector<Point> positions;
+		std::vector<HoleType> holeTypes;
 
 		//+-列の穴
 		if (i == 0 || i == 1 || i == 12 || i == 13) {
@@ -1163,9 +1318,11 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 				//穴があったら表示　+　補正
 				if (checkHoleUsed(hole, result, labels, status)) {
 					breadBoard.usedHoles.push_back(Point(j, i));
+					holeTypes.push_back(HoleType::MIDDLE);
 				}
 				else {
 					breadBoard.unusedHoles.push_back(Point(j, i));
+					holeTypes.push_back(HoleType::EMPTY);
 				}
 
 				positions.push_back(hole);
@@ -1175,9 +1332,9 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 				}
 
 				if (j % 5 == 4) 
-					hole.x += disAddX;
+					hole.x += DIS_NEXT_LONG_X;
 				else
-					hole.x += distance.x;
+					hole.x += DIS_NEXT_HOLE.x;
 			}
 		}
 		else {
@@ -1186,9 +1343,11 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 				//穴があったら表示　+　補正
 				if (checkHoleUsed(hole, result, labels, status)) {
 					breadBoard.usedHoles.push_back(Point(j, i));
+					holeTypes.push_back(HoleType::MIDDLE);
 				}
 				else {
 					breadBoard.unusedHoles.push_back(Point(j, i));
+					holeTypes.push_back(HoleType::EMPTY);
 				}
 
 				positions.push_back(hole);
@@ -1197,27 +1356,28 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 					leftHole = hole;
 				}
 
-				hole.x += distance.x;
+				hole.x += DIS_NEXT_HOLE.x;
 			}
 		}
 
 		hole = leftHole;
 		if (i == 1) {
-			hole.x += disAddY.x;
-			hole.y += disAddY.y;
+			hole.x += DIS_PLUS_TO_J.x;
+			hole.y += DIS_PLUS_TO_J.y;
 		}
 		else if (i == 11) {
-			hole.x += disAddY2.x;
-			hole.y += disAddY2.y;
+			hole.x += DIS_A_TO_MINUS.x;
+			hole.y += DIS_A_TO_MINUS.y;
 		}
 		else if (i == 6) {
-			hole.y += holeGapY;
+			hole.y += DIS_F_TO_E;
 		}
 		else {
-			hole.y += distance.y;
+			hole.y += DIS_NEXT_HOLE.y;
 		}
 
 		breadBoard.holePositions.push_back(positions);
+		breadBoard.holeTypes.push_back(holeTypes);
 	}
 
 	//再判定
@@ -1225,7 +1385,7 @@ void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labe
 }
 
 void CSampleDlg::reCheckHoleUsed(Mat& result, Mat labels, Mat status) {
-	Point DISTANCE(30, 30);
+	Point DISTANCE(30 * 1.5, 30 * 1.5);
 
 	vector<Point> reCheck(breadBoard.usedHoles.size());
 	copy(breadBoard.usedHoles.begin(), breadBoard.usedHoles.end(), reCheck.begin());
@@ -1265,6 +1425,10 @@ void CSampleDlg::reCheckHoleUsed(Mat& result, Mat labels, Mat status) {
 			}
 		}
 
+		//
+		if (count == 0)
+			continue;
+
 		int ave = sum / count;
 		hole.x = ave;
 		//判定関係なく位置は更新する
@@ -1274,6 +1438,7 @@ void CSampleDlg::reCheckHoleUsed(Mat& result, Mat labels, Mat status) {
 		if (!checkHoleUsed(hole, result, labels, status)) {
 			breadBoard.unusedHoles.push_back(position);
 			breadBoard.deleteUsedHole(position);
+			breadBoard.holeTypes.at(position.y).at(position.x) = HoleType::EMPTY;
 
 			if (breadBoard.checkUsed(position.y, position.x + 1)) 
 				reCheckChain.push_back(Point(position.x + 1, position.y));
@@ -1296,6 +1461,7 @@ void CSampleDlg::reCheckHoleUsed(Mat& result, Mat labels, Mat status) {
 				if (!checkHoleUsed(p, result, labels, status)) {
 					breadBoard.unusedHoles.push_back(nextHole);
 					breadBoard.deleteUsedHole(nextHole);
+					breadBoard.holeTypes.at(position.y).at(position.x) = HoleType::EMPTY;
 				}
 
 				breadBoard.holePositions.at(nextHole.y).at(nextHole.x) = p;
@@ -1309,11 +1475,19 @@ void CSampleDlg::reCheckHoleUsed(Mat& result, Mat labels, Mat status) {
 
 void CSampleDlg::judgeHoleType(Mat input, Mat& result) {
 	result = input.clone();
+
+
+	vector<Point> used(breadBoard.usedHoles.size());
+	copy(breadBoard.usedHoles.begin(), breadBoard.usedHoles.end(), used.begin());
+
 	//使用している穴
-	for (auto itr = breadBoard.usedHoles.begin(); itr != breadBoard.usedHoles.end(); ++itr) {
+	while (!used.empty()) {
+		auto itr = used.begin();
 		Point position = *itr;
+		used.erase(itr);
+
 		Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
-		int s = 4;
+		int s = 10 * 1.5;
 		int left = usedHole.x - s;
 		int top = usedHole.y - s;
 		int right = usedHole.x + s;
@@ -1325,17 +1499,22 @@ void CSampleDlg::judgeHoleType(Mat input, Mat& result) {
 			color = Scalar(255, 255, 0);
 		else if (holeType.type == HoleType::EDGE)
 			color = Scalar(0, 255, 255);
-		else if (holeType.type == HoleType::EMPTY)
+		else if (holeType.type == HoleType::EMPTY) {
 			color = Scalar(0, 255, 0);
+			breadBoard.deleteUsedHole(position);
+			breadBoard.unusedHoles.push_back(position);
+		}
+
+		breadBoard.holeTypes.at(position.y).at(position.x) = holeType;
 
 
-		rectangle(result, Rect(left, top,s * 2, s * 2), color, 2);
+		rectangle(result, Rect(left, top, s * 2, s * 2), color, 2);
 	}
 }
 
 HoleType CSampleDlg::saveHole(Point position) {
 	Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
-	int size = 25;
+	int size = 25 * 1.5;
 	int x = usedHole.x - size;
 	int y = usedHole.y - size;
 	int w = usedHole.x + size;
@@ -1460,9 +1639,9 @@ void CSampleDlg::OnHoukoku()
 }
 
 void CSampleDlg::drawOnLine(OnLine line) {
-	for (ChainPoint chain : line.getChains()) {
-		m_Image->drawLine(chain.point1, chain.point2);
-	}
+	//for (Connection chain : line.getChains()) {
+	//	m_Image->drawLine(chain.point1, chain.point2);
+	//}
 }
 
 void CSampleDlg::UpdateImage(int height, int width) {

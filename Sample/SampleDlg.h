@@ -63,8 +63,10 @@ protected:
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
 	BreadBoard breadBoard;
-	const int WIDTH = 1280;
-	const int HEIGHT = 720;
+	//const int WIDTH = 1280;
+	//const int HEIGHT = 720;
+	const int WIDTH = 1920;
+	const int HEIGHT = 1080;
 	int fileIndex;
 
 public:
@@ -113,4 +115,8 @@ public:
 	void deleteResultFile();
 	bool checkHoleUsed(Point& hole, Mat& result, Mat labels, Mat status);
 	void reCheckHoleUsed(Mat& result, Mat labels, Mat status);
+	void drawHoleType(Mat& result);
+	void detectLineConnect();
+	void drawLineConnet(Mat& result);
+	void createTestBoard();
 };
