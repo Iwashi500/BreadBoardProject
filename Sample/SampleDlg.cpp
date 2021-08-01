@@ -870,9 +870,44 @@ void CSampleDlg::OnTest()
 
 	Mat result;
 
+	//上下線の領域取得
+	Point minP, maxP;
+	Rect boardArea;
+	getBoardRect(input, boardArea);
+
+	//ボード領域マスク画像生成
+	Mat boardMask(Size(input.cols, input.rows), CV_8UC1, Scalar(0));
+	rectangle(boardMask, boardArea, 255, -1);
+
+	//入力画像の上下線を除去する
+	Rect topLine = boardArea;
+	Rect downLine = boardArea;
+	Mat removeResult;
+	topLine.y += TOP_TO_LINT_DIS;
+	topLine.height = LINE_HEIGHT;
+	downLine.y = boardArea.y + boardArea.height - TOP_TO_LINT_DIS - LINE_HEIGHT;
+	downLine.height = LINE_HEIGHT;
+	rectangle(boardMask, topLine, 0, -1);
+	rectangle(boardMask, downLine, 0, -1);
+	input.copyTo(removeResult, boardMask);
+
+	//上下線を除去して結合
+	Rect t1r = boardArea;
+	t1r.height = TOP_TO_LINT_DIS;
+	Rect t2r = boardArea;
+	t2r.y += TOP_TO_LINT_DIS + LINE_HEIGHT;
+	t2r.height = 635;
+	Rect t3r = t1r;
+	t3r.y += TOP_TO_LINT_DIS + LINE_HEIGHT + 635 + LINE_HEIGHT;
+	Mat t1 = Mat(input, t1r);
+	Mat t2 = Mat(input, t2r);
+	Mat t3 = Mat(input, t3r);
+	Mat tes[3] = { t1, t2, t3 };
+	vconcat(tes, 3, concatInput);
+
 	//HSV
 	Mat hsv;
-	cvtColor(input, hsv, CV_BGR2HSV);
+	cvtColor(concatInput, hsv, CV_BGR2HSV);
 	Scalar sMin = Scalar(0, 0, 130);
 	Scalar sMax = Scalar(180, 20, 255);
 	Mat mask;
@@ -880,32 +915,27 @@ void CSampleDlg::OnTest()
 
 	//エッジ検出
 	Mat edge;
-	Canny(mask, edge, 200, 255);
-
-	//上下線の領域取得
-	Point minP, maxP;
-	Rect area;
-	getBoardRect(input, area);
-
-	//穴マスク画像生成
-	Mat holeMask(Size(input.cols, input.rows), CV_8UC3, Scalar(0));
-	rectangle(holeMask, area, Scalar(255, 255, 255), -1);
+	Canny(mask, edge, 200, 255);	
 
 	//収縮処理
+	//現在無くしてる
 	Mat erosion;
-	morphologyEx(mask, erosion, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(3, 3)));
-	erosion = mask.clone();
+	morphologyEx(mask, erosion, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(5, 5)));
+	//erosion = mask.clone();
 
 	//反転
 	Mat reverse;
 	cv::bitwise_not(erosion, reverse);
+	//Mat buf;
+	//reverse.copyTo(buf, boardMask);
+	//reverse = buf.clone();
 
 	//ラベリング
 	Mat labels, stats, centroids;
 	int nLab = connectedComponentsWithStats(reverse, labels, stats, centroids, 4, CV_32S);
 	Mat filLabels = labels.clone();
-	int borderMax = 300 * 1.5;
-	int borderMin = 50 * 1.5;
+	int borderMax = 500;
+	int borderMin = 90;
 	Mat filter;
 	reverse.copyTo(filter);
 	Mat output(labels.size(), labels.type());
@@ -931,54 +961,52 @@ void CSampleDlg::OnTest()
 
 	//搭載穴の左上検出
 	Mat hole;
-	input.copyTo(hole, filter);
-	hole.copyTo(hole, holeMask);
-	Point leftTop(area.x, area.y);
+	concatInput.copyTo(hole, filter);
+	//hole.copyTo(hole, boardMask);
+	Point leftTop(boardArea.x, boardArea.y);
 
 	//搭載穴の検出
 	Mat holeResult;
-	detectBoardHole(hole, holeResult, leftTop, filLabels, stats);
+	detectBoardHole(hole, holeResult, Point(0, 0), filLabels, stats);
 
 	//搭載穴の判別
 	Mat holeTypeResult;
 	judgeHoleType(holeResult, holeTypeResult);
 
-
-	breadBoard.usedHoles.push_back(Point(7, 7));
-	breadBoard.holeTypes.at(7).at(7) = HoleType::EDGE;
-
-
-
 	//穴の状態の画像生成
-	Mat resultType = input.clone();
+	Mat resultType = concatInput.clone();
 	drawHoleType(resultType);
 
 	//部品の抜き出し
 	Mat parts;
-	cutParts(input, parts, reverse, labels, stats);
+	cutParts(concatInput, parts, reverse, labels, stats);
 
 	//配線検出
-	Mat lineConnect = input.clone();
+	Mat lineConnect = concatInput.clone();
 	detectLineConnect();
-	drawLineConnet(lineConnect);
+	drawLineConnect(lineConnect);
+	Mat lineConnectInput;
+	drawLineConnectInput(lineConnectInput, Point(boardArea.x, boardArea.y));
 
-	//結果画像生成
-	Mat holeOnly, resultMask;
-	absdiff(hole, holeTypeResult, holeOnly);
-	inRange(holeOnly, Scalar(0, 0, 0), Scalar(1, 1, 1), resultMask);
-	input.copyTo(result, resultMask);
-	result += holeOnly;
+	////結果画像生成
+	//Mat holeOnly, resultMask;
+	//absdiff(hole, holeTypeResult, holeOnly);
+	//inRange(holeOnly, Scalar(0, 0, 0), Scalar(1, 1, 1), resultMask);
+	//concatInput.copyTo(result, resultMask);
+	//result += holeOnly;
 
 	Mat showResult;
-	resize(lineConnect, showResult, Size(), 0.5, 0.5);
+	resize(lineConnectInput, showResult, Size(), 0.5, 0.5);
 
 	//画像保存
 	imshow("result", showResult);
 	imwrite(path + format("%d_", getFileIndex()) + "input.bmp", input);
+	imwrite(path + format("%d_", getFileIndex()) + "holeMask.bmp", boardMask);
+	imwrite(path + format("%d_", getFileIndex()) + "removeResult.bmp", removeResult);
+	imwrite(path + format("%d_", getFileIndex()) + "concat.bmp", concatInput);
 	imwrite(path + format("%d_", getFileIndex()) + "hsv.bmp", hsv);
 	imwrite(path + format("%d_", getFileIndex()) + "mask.bmp", mask);
 	imwrite(path + format("%d_", getFileIndex()) + "edge.bmp", edge);
-	imwrite(path + format("%d_", getFileIndex()) + "holeMask.bmp", holeMask);
 	imwrite(path + format("%d_", getFileIndex()) + "erosion.bmp", erosion);
 	imwrite(path + format("%d_", getFileIndex()) + "reverse.bmp", reverse);
 	imwrite(path + format("%d_", getFileIndex()) + "labels.bmp", labels);
@@ -989,7 +1017,8 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", getFileIndex()) + "holeTypeResult.bmp", holeTypeResult);
 	imwrite(path + format("%d_", getFileIndex()) + "resultType.bmp", resultType);
 	imwrite(path + format("%d_", getFileIndex()) + "lineConnect.bmp", lineConnect);
-	imwrite(path + format("%d_", getFileIndex()) + "result.bmp", result);
+	imwrite(path + format("%d_", getFileIndex()) + "lineConnect.bmp", lineConnectInput);
+	//imwrite(path + format("%d_", getFileIndex()) + "result.bmp", result);
 }
 
 void CSampleDlg::createTestBoard() {
@@ -1008,10 +1037,57 @@ void CSampleDlg::createTestBoard() {
 	//}
 }
 
-void CSampleDlg::drawLineConnet(Mat& result) {
+void CSampleDlg::drawLineConnect(Mat& result) {
 	for (auto connect : breadBoard.connections) {
 		Point hole1 = breadBoard.getHolePosition(connect.point1);
 		Point hole2 = breadBoard.getHolePosition(connect.point2);
+		Scalar color;
+		if (connect.type == "wire")
+			color = GREEN;
+		else if (connect.type == "resistor")
+			color = YELLOW;
+		else
+			color = RED;
+
+		line(result, hole1, hole2, color, 3);
+		circle(result, hole1, 10, GREEN, -1);
+		circle(result, hole2, 10, GREEN, -1);
+	}
+}
+
+void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
+	result = input.clone();
+
+	for (auto connect : breadBoard.connections) {
+		Point hole1 = breadBoard.getHolePosition(connect.point1);
+		Point hole2 = breadBoard.getHolePosition(connect.point2);
+
+		if (connect.point1.y <= 1) {
+			hole1.x += leftTop.x;
+			hole1.y += leftTop.y;
+		}
+		else if (connect.point1.y <= 11) {
+			hole1.x += leftTop.x;
+			hole1.y += leftTop.y + LINE_HEIGHT;
+		}
+		else {
+			hole1.x += leftTop.x;
+			hole1.y += leftTop.y + LINE_HEIGHT + LINE_HEIGHT;
+		}
+
+		if (connect.point2.y <= 1) {
+			hole2.x += leftTop.x;
+			hole2.y += leftTop.y;
+		}
+		else if (connect.point2.y <= 11) {
+			hole2.x += leftTop.x;
+			hole2.y += leftTop.y + LINE_HEIGHT;
+		}
+		else {
+			hole2.x += leftTop.x;
+			hole2.y += leftTop.y + LINE_HEIGHT + LINE_HEIGHT;
+		}
+
 		Scalar color;
 		if (connect.type == "wire")
 			color = GREEN;
@@ -1295,12 +1371,19 @@ bool CSampleDlg::checkHoleUsed(Point& hole, Mat& result, Mat labels, Mat status)
 
 void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labels, Mat status) {
 	result = input.clone();
-	Point DIS_BOARD_TO_HOLE(80 * 1.5, 45 * 1.5);
-	Point DIS_NEXT_HOLE(30 * 1.5, 30 * 1.5);
-	int DIS_NEXT_LONG_X = 60 * 1.5;
-	Point DIS_PLUS_TO_J(-11 * 1.5, 83 * 1.5);
-	Point DIS_A_TO_MINUS(15 * 1.5, 83 * 1.5);
-	int DIS_F_TO_E = 87 * 1.5;
+	//Point DIS_BOARD_TO_HOLE(80 * 1.5, 45 * 1.5);
+	//Point DIS_NEXT_HOLE(30 * 1.5, 30 * 1.5);
+	//int DIS_NEXT_LONG_X = 60 * 1.5;
+	//Point DIS_PLUS_TO_J(-11 * 1.5, 83 * 1.5);
+	//Point DIS_A_TO_MINUS(15 * 1.5, 83 * 1.5);
+	//int DIS_F_TO_E = 87 * 1.5;
+	int lineHeigth = 50;
+	Point DIS_BOARD_TO_HOLE(120, 67);
+	Point DIS_NEXT_HOLE(45, 45);
+	int DIS_NEXT_LONG_X = 90;
+	Point DIS_PLUS_TO_J(-16, 124 - lineHeigth);
+	Point DIS_A_TO_MINUS(22, 124 - lineHeigth);
+	int DIS_F_TO_E = 130;
 
 	Point hole(leftTop.x + DIS_BOARD_TO_HOLE.x, leftTop.y + DIS_BOARD_TO_HOLE.y);
 	Point leftHole = hole;
@@ -1520,7 +1603,7 @@ HoleType CSampleDlg::saveHole(Point position) {
 	int w = usedHole.x + size;
 	int h = usedHole.y + size;
 
-	Mat holeRaw = Mat(input, Rect(Point(x, y), Point(w, h))).clone();
+	Mat holeRaw = Mat(concatInput, Rect(Point(x, y), Point(w, h))).clone();
 	String path = RESULT_PATH + "holes\\";
 	String holeName =  "hole_" + BreadBoard::getHoleName(position);
 	HoleType holeType;
@@ -1550,15 +1633,19 @@ HoleType CSampleDlg::saveHole(Point position) {
 		inRange(hsv, sMin, sMax, range);
 		cv::bitwise_not(range, range_rev);
 
+		//膨張
+		morphologyEx(range_rev, range_rev, MORPH_DILATE, getStructuringElement(MORPH_RECT, Size(5, 5)));
 
 		Mat labels, status, centroids;
-		connectedComponentsWithStats(range, labels, status, centroids, 4, CV_32S);
-
+		connectedComponentsWithStats(range_rev, labels, status, centroids, 8, CV_32S);
 		int* label = labels.ptr<int>(size, size);
-		if (*label == 0)
-			connectedComponentsWithStats(range_rev, labels, status, centroids, 4, CV_32S);
-		else
-			printf("");
+		//connectedComponentsWithStats(range, labels, status, centroids, 4, CV_32S);
+
+		//int* label = labels.ptr<int>(size, size);
+		//if (*label == 0)
+		//	connectedComponentsWithStats(range_rev, labels, status, centroids, 4, CV_32S);
+		//else
+		//	printf("");
 
 		int* param = status.ptr<int>(*label);
 		int left = param[ConnectedComponentsTypes::CC_STAT_LEFT];
@@ -1591,7 +1678,7 @@ HoleType CSampleDlg::saveHole(Point position) {
 			holeType.type = HoleType::EDGE;
 		}
 
-		imwrite(path + holeName + "_range" + ".bmp", range);
+		//imwrite(path + holeName + "_range" + ".bmp", range);
 		imwrite(path + holeName + "_range_rev" + ".bmp", range_rev);
 		imwrite(path + holeName + "_labels" + ".bmp", labels);
 	}

@@ -40,7 +40,12 @@ public:
 	CString IWI_PATH = "C:\\Users\\IWI\\Desktop\\IWI\\";
 	CString RESULT_PATH = "C:\\Users\\IWI\\Desktop\\IWI\\結果\\";
 	VideoCapture videoCapture;
-	Mat input;
+
+	Mat input; //入力画像
+	Mat concatInput; //上下線除去後に接合した入力画像
+	int TOP_TO_LINT_DIS = 130; //ボードの頂点から、除去する線までの距離
+	int LINE_HEIGHT = 50; //除去する線の高さ
+	int MIDDLE_BOARD_HEIGHT = 635; //ボードの中央の高さ
 	UINT m_timerID;
 
 // ダイアログ データ
@@ -117,6 +122,7 @@ public:
 	void reCheckHoleUsed(Mat& result, Mat labels, Mat status);
 	void drawHoleType(Mat& result);
 	void detectLineConnect();
-	void drawLineConnet(Mat& result);
+	void drawLineConnect(Mat& result);
+	void drawLineConnectInput(Mat& result, Point leftTop);
 	void createTestBoard();
 };
