@@ -19,6 +19,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/imgproc/types_c.h>
 #include <atlpath.h> // CPathのため必要
+#include<iostream>
+#include<fstream>
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -980,6 +982,7 @@ void CSampleDlg::OnTest()
 	//部品の抜き出し
 	Mat parts;
 	cutParts(concatInput, parts, reverse, labels, stats);
+	drawParts(parts);
 
 	//配線検出
 	Mat lineConnect = concatInput.clone();
@@ -997,6 +1000,9 @@ void CSampleDlg::OnTest()
 
 	Mat showResult;
 	resize(lineConnectInput, showResult, Size(), 0.5, 0.5);
+
+	//回路図の表示
+	showCircuitDiagram();
 
 	//画像保存
 	imshow("result", showResult);
@@ -1017,8 +1023,62 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", getFileIndex()) + "holeTypeResult.bmp", holeTypeResult);
 	imwrite(path + format("%d_", getFileIndex()) + "resultType.bmp", resultType);
 	imwrite(path + format("%d_", getFileIndex()) + "lineConnect.bmp", lineConnect);
-	imwrite(path + format("%d_", getFileIndex()) + "lineConnect.bmp", lineConnectInput);
+	imwrite(path + format("%d_", getFileIndex()) + "lineConnectInput.bmp", lineConnectInput);
 	//imwrite(path + format("%d_", getFileIndex()) + "result.bmp", result);
+}
+
+void CSampleDlg::showCircuitDiagram() {
+	FILE* fpw;
+	fopen_s(&fpw, "test.txt", "w, ccs=UTF-8");
+	fputws(L"ああああああ\n", fpw);
+	fclose(fpw);
+
+	//pythonファイルの作成
+	FILE* fp;
+	errno_t error;
+	if ((error = fopen_s(&fp, fileName, "wt, ccs=UTF-8")) != 0) {
+		return;
+	}
+
+	//ヘッダ(インポート、Drawing生成)
+	fputws(L"import schemdraw\n", fp);
+	fputws(L"import schemdraw.elements as elm\n", fp);
+	fputws(L"d = schemdraw.Drawing()\n", fp);
+	//回路
+	fputws(L"d += elm.Resistor().right().label('R1')\n", fp);
+	fputws(L"d += elm.Dot()\n", fp);
+	fputws(L"d.push()\n", fp);
+	fputws(L"d += elm.Resistor().down().label('R2')\n", fp);
+	fputws(L"d += elm.Dot()\n", fp);
+	fputws(L"d += elm.Line().left()\n", fp);
+	fputws(L"d += elm.BatteryCell().up().reverse().label('E')\n", fp);
+	fputws(L"d.pop()\n", fp);
+	fputws(L"d += elm.Line().right()\n", fp);
+	fputws(L"d += elm.Resistor().down().label('R3')\n", fp);
+	fputws(L"d += elm.Line().left()\n", fp);
+	//fputws(L"d += elm.Vdd\n", fp);
+	//fputws(L"d += elm.Resistor().down().label('10K')\n", fp);
+	//fputws(L"d += elm.LED()\n", fp);
+	//fputws(L"d += elm.GND()\n", fp);
+	//フッタ(表示、保存)
+	fputws(L"d.draw()\n", fp);
+	fputws(L"d.save('CircuitDiagram.svg')\n", fp);
+	CStringW saveW = L"d.save(r'" + (CStringW)RESULT_PATH + L"CircuitDiagram.svg')";
+	const size_t newsizew = (saveW.GetLength() + 1) * 2;
+	wchar_t* n2stringw = new wchar_t[newsizew];
+	wcscpy_s(n2stringw, newsizew, saveW);
+	fputws(n2stringw, fp);
+	fclose(fp);
+
+	//コマンドから実行
+	auto ret = system(nullptr);
+	if (ret == 0)
+		return;
+	system("python CircuitDiagram.py");
+}
+
+void CSampleDlg::drawParts(Mat& result) {
+
 }
 
 void CSampleDlg::createTestBoard() {

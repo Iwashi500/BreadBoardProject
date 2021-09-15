@@ -36,6 +36,7 @@ public:
 	LPBITMAPINFO m_OrgBmpInfo;
 	CString m_fileName; //開いているファイルの名前
 	CString m_filePath; //開いているファイルのパス
+	CString fileName = "CircuitDiagram.py"; //生成する回路図表示用のpythonファイル名
 
 	CString IWI_PATH = "C:\\Users\\IWI\\Desktop\\IWI\\";
 	CString RESULT_PATH = "C:\\Users\\IWI\\Desktop\\IWI\\結果\\";
@@ -125,4 +126,6 @@ public:
 	void drawLineConnect(Mat& result);
 	void drawLineConnectInput(Mat& result, Point leftTop);
 	void createTestBoard();
+	void drawParts(Mat& result);
+	void showCircuitDiagram();
 };
