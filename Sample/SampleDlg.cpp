@@ -6,6 +6,7 @@
 #include "framework.h"
 #include "Sample.h"
 #include "SampleDlg.h"
+#include "SchemDraw.h"
 #include "afxdialogex.h"
 #include "iostream"
 #include <time.H>
@@ -975,6 +976,11 @@ void CSampleDlg::OnTest()
 	Mat holeTypeResult;
 	judgeHoleType(holeResult, holeTypeResult);
 
+	//調整用　消せ！！//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	breadBoard.holeTypes.at(8).at(8) = HoleType::EDGE;
+	breadBoard.holeTypes.at(12).at(17) = HoleType::EDGE;
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 	//穴の状態の画像生成
 	Mat resultType = concatInput.clone();
 	drawHoleType(resultType);
@@ -982,6 +988,12 @@ void CSampleDlg::OnTest()
 	//部品の抜き出し
 	Mat parts;
 	cutParts(concatInput, parts, reverse, labels, stats);
+
+	//調整用　消せ！！//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	breadBoard.parts.at(2).type = "wire";
+	breadBoard.parts.at(5).type = "wire";
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 	drawParts(parts);
 
 	//配線検出
@@ -1002,7 +1014,7 @@ void CSampleDlg::OnTest()
 	resize(lineConnectInput, showResult, Size(), 0.5, 0.5);
 
 	//回路図の表示
-	showCircuitDiagram();
+	//showCircuitDiagram();
 
 	//画像保存
 	imshow("result", showResult);
@@ -1028,47 +1040,90 @@ void CSampleDlg::OnTest()
 }
 
 void CSampleDlg::showCircuitDiagram() {
-	FILE* fpw;
-	fopen_s(&fpw, "test.txt", "w, ccs=UTF-8");
-	fputws(L"ああああああ\n", fpw);
-	fclose(fpw);
+	SchemDraw d = SchemDraw();
 
-	//pythonファイルの作成
-	FILE* fp;
-	errno_t error;
-	if ((error = fopen_s(&fp, fileName, "wt, ccs=UTF-8")) != 0) {
-		return;
+	vector<Connection> connects, first;
+	copy(breadBoard.connections.begin(), breadBoard.connections.end(), back_inserter(connects));
+	copy(breadBoard.connections.begin(), breadBoard.connections.end(), back_inserter(first));
+	vector<Connection> startVcc;
+	Point currentBoard;
+	vector<Point> pushPointBoard;
+	Point currentCircuit = Point(0, 0);
+	vector<Point> pushPointCircuit;
+
+	while (!first.empty()) {
+		auto ite = first.begin();
+		Connection connect = *ite;
+		first.erase(ite);
+
+		if (connect.point1.y == 1 || connect.point2.y == 1) {
+			startVcc.push_back(connect);
+		}
 	}
 
-	//ヘッダ(インポート、Drawing生成)
-	fputws(L"import schemdraw\n", fp);
-	fputws(L"import schemdraw.elements as elm\n", fp);
-	fputws(L"d = schemdraw.Drawing()\n", fp);
-	//回路
-	fputws(L"d += elm.Resistor().right().label('R1')\n", fp);
-	fputws(L"d += elm.Dot()\n", fp);
-	fputws(L"d.push()\n", fp);
-	fputws(L"d += elm.Resistor().down().label('R2')\n", fp);
-	fputws(L"d += elm.Dot()\n", fp);
-	fputws(L"d += elm.Line().left()\n", fp);
-	fputws(L"d += elm.BatteryCell().up().reverse().label('E')\n", fp);
-	fputws(L"d.pop()\n", fp);
-	fputws(L"d += elm.Line().right()\n", fp);
-	fputws(L"d += elm.Resistor().down().label('R3')\n", fp);
-	fputws(L"d += elm.Line().left()\n", fp);
-	//fputws(L"d += elm.Vdd\n", fp);
-	//fputws(L"d += elm.Resistor().down().label('10K')\n", fp);
-	//fputws(L"d += elm.LED()\n", fp);
-	//fputws(L"d += elm.GND()\n", fp);
-	//フッタ(表示、保存)
-	fputws(L"d.draw()\n", fp);
-	fputws(L"d.save('CircuitDiagram.svg')\n", fp);
-	CStringW saveW = L"d.save(r'" + (CStringW)RESULT_PATH + L"CircuitDiagram.svg')";
-	const size_t newsizew = (saveW.GetLength() + 1) * 2;
-	wchar_t* n2stringw = new wchar_t[newsizew];
-	wcscpy_s(n2stringw, newsizew, saveW);
-	fputws(n2stringw, fp);
-	fclose(fp);
+	if (startVcc.empty()) {
+		//throw "適切な回路が組まれていません。\nVccに繋がる線が無い";
+		return;
+	}
+	else if(startVcc.size() == 1) {
+		d.addVdd();
+	}
+	else {
+		d.addVdd();
+		d.addDot();
+		for (int i = 0; i < startVcc.size() - 1; i++) {
+			d.push();
+		}
+	}
+
+	while (!startVcc.empty()) {
+		auto c = find(connects.begin(), connects.end(), startVcc.at(0));
+		startVcc.erase(c);
+		Connection start = *c;
+		currentCircuit = Point(0, 0);
+		Connection currentConnect = start;
+		currentBoard = start.point1;
+		if (start.point1.y == 1)
+			currentBoard = start.point2;
+
+		while (1) {
+			//GND
+			if (currentBoard.y == 0 || currentBoard.y == 13) {
+				d.addGND();
+			}
+			int x = currentBoard.x;
+			
+			vector<int> yList;
+
+		}
+	}
+
+	//d.addVdd();
+	//d.addDot();
+	//d.push();
+	//d.push();
+	//
+	//d.addPart(SchemDraw::Resister, SchemDraw::DOWN, L"R1");
+	//d.addPart(SchemDraw::LED, SchemDraw::DOWN, L"LED1");
+	//d.addDot();
+	//
+	//d.pop();
+	//d.addPart(SchemDraw::Line, SchemDraw::LEFT);
+	//d.addPart(SchemDraw::Resister, SchemDraw::DOWN, L"R2");
+	//d.addPart(SchemDraw::LED, SchemDraw::DOWN, L"LED2");
+	//d.addPart(SchemDraw::Line, SchemDraw::RIGHT);
+	//d.addDot();
+
+	//d.pop();
+	//d.addPart(SchemDraw::Line, SchemDraw::RIGHT);
+	//d.addPart(SchemDraw::Resister, SchemDraw::DOWN, L"R3");
+	//d.addPart(SchemDraw::LED, SchemDraw::DOWN, L"LED3");
+	//d.addPart(SchemDraw::Line, SchemDraw::LEFT);
+	//d.addDot();
+
+	//d.addGND();
+
+	//d.draw(RESULT_PATH);
 
 	//コマンドから実行
 	auto ret = system(nullptr);

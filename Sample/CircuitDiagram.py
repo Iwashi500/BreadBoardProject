@@ -1,17 +1,1 @@
-﻿import schemdraw
-import schemdraw.elements as elm
-d = schemdraw.Drawing()
-d += elm.Resistor().right().label('R1')
-d += elm.Dot()
-d.push()
-d += elm.Resistor().down().label('R2')
-d += elm.Dot()
-d += elm.Line().left()
-d += elm.BatteryCell().up().reverse().label('E')
-d.pop()
-d += elm.Line().right()
-d += elm.Resistor().down().label('R3')
-d += elm.Line().left()
-d.draw()
-d.save('CircuitDiagram.svg')
-d.save(r'C:\Users\iwasi\Desktop\研究\IWI\結果\CircuitDiagram.svg')
+﻿
