@@ -1,12 +1,4 @@
 type,point1_x,point1_y,point2_x,point2_y
 wire,8,3,8,5
-wire,8,7,8,8
-wire,13,7,13,9
-wire,8,8,8,10
-wire,21,9,21,11
 wire,7,1,8,3
-resistor,8,5,8,8
-wire,8,7,13,7
-resistor,13,9,21,9
-wire,8,10,7,12
-wire,21,11,17,12
+resistor,8,5,8,10

@@ -128,5 +128,4 @@ public:
 	void createTestBoard();
 	void drawParts(Mat& result);
 	void showCircuitDiagram();
-	void drawCircuitDirect(Mat& result);
 };

@@ -860,9 +860,9 @@ void CSampleDlg::OnTest()
 	initSystem();
 	String path = RESULT_PATH;
 
-	//if (!videoCapture.isOpened())
-	//	initCamera();
-	//videoCapture.read(input);
+	if (!videoCapture.isOpened())
+		initCamera();
+	videoCapture.read(input);
 	if (input.empty()) {
 		String inputPath = RESULT_PATH + "input.bmp";
 		input = imread(inputPath, 1);
@@ -898,15 +898,27 @@ void CSampleDlg::OnTest()
 	Rect t1r = boardArea;
 	t1r.height = TOP_TO_LINT_DIS;
 	Rect t2r = boardArea;
-	t2r.y += TOP_TO_LINT_DIS + LINE_HEIGHT;
-	t2r.height = 635;
+	t2r.y += TOP_TO_LINT_DIS + LINE_HEIGHT + 5;
+	t2r.height = 635 - 10;
 	Rect t3r = t1r;
-	t3r.y += TOP_TO_LINT_DIS + LINE_HEIGHT + 635 + LINE_HEIGHT;
+	t3r.y = boardArea.y + boardArea.height - TOP_TO_LINT_DIS;
 	Mat t1 = Mat(input, t1r);
 	Mat t2 = Mat(input, t2r);
 	Mat t3 = Mat(input, t3r);
+
 	Mat tes[3] = { t1, t2, t3 };
 	vconcat(tes, 3, concatInput);
+
+	//Rect t4r = t2r;
+	//int h = 270;
+	//t4r.height = h;
+	//Rect t5r = t4r;
+	//t5r.y = t2r.y + h + 60;
+	//Mat t4 = Mat(input, t4r);
+	//Mat t5 = Mat(input, t5r);
+
+	//Mat tes[4] = { t1, t4, t5, t3 };
+	//vconcat(tes, 4, concatInput);
 
 	//HSV
 	Mat hsv;
@@ -976,11 +988,6 @@ void CSampleDlg::OnTest()
 	Mat holeTypeResult;
 	judgeHoleType(holeResult, holeTypeResult);
 
-	//調整用　消せ！！//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	breadBoard.holeTypes.at(8).at(8) = HoleType::EDGE;
-	breadBoard.holeTypes.at(12).at(17) = HoleType::EDGE;
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 	//穴の状態の画像生成
 	Mat resultType = concatInput.clone();
 	drawHoleType(resultType);
@@ -988,11 +995,6 @@ void CSampleDlg::OnTest()
 	//部品の抜き出し
 	Mat parts;
 	cutParts(concatInput, parts, reverse, labels, stats);
-
-	//調整用　消せ！！//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	breadBoard.parts.at(2).type = "wire";
-	breadBoard.parts.at(5).type = "wire";
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	drawParts(parts);
 
@@ -1015,8 +1017,6 @@ void CSampleDlg::OnTest()
 
 	//回路図の表示
 	showCircuitDiagram();
-	//Mat drawCircuit = lineConnect.clone();
-	//drawCircuitDirect(drawCircuit);
 
 	//画像保存
 	imshow("result", showResult);
@@ -1038,148 +1038,10 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", getFileIndex()) + "resultType.bmp", resultType);
 	imwrite(path + format("%d_", getFileIndex()) + "lineConnect.bmp", lineConnect);
 	imwrite(path + format("%d_", getFileIndex()) + "lineConnectInput.bmp", lineConnectInput);
-	//imwrite(path + format("%d_", getFileIndex()) + "circuit.bmp", drawCircuit);
 	//imwrite(path + format("%d_", getFileIndex()) + "result.bmp", result);
 }
 
-void CSampleDlg::drawCircuitDirect(Mat& result) {
-	//String inputPath = RESULT_PATH + "Resistor.png";
-	//Mat Resistor = imread(inputPath, 1);
-
-	////470, 330 ~ 470, 510
-	//double dx, dy;
-	//int diffY = 510 - 330;
-	//int diffX = 470 - 470;
-	//dy = (double)diffY / Resistor.rows;
-	//Mat r;
-	//resize(Resistor, r, Size(), 1, dy);
-	//Mat roi = result(Rect(460, 330, r.cols, r.rows));
-	//r.copyTo(roi);
-
-	////695, 597 ~ 1053, 597
-	//diffX = 1053 - 695;
-	//dx = (double)diffX / Resistor.rows;
-	//resize(Resistor, r, Size(), 1, dx);
-	//rotate(r, r, ROTATE_90_CLOCKWISE);
-	//roi = result(Rect(695, 585, r.cols, r.rows));
-	//r.copyTo(roi);
-
-
-	CString fileName = "connects-parameter.csv"; //生成する回路図表示用のpythonファイル名
-	FILE* fp;
-	errno_t error;
-	if ((error = fopen_s(&fp, fileName, "wt")) != 0) {
-		return;
-	}
-
-	//ヘッダ(インポート、Drawing生成)
-	fputs("type,point1_x,point1_y,point2_x,point2_y\n", fp);
-	//fputws(L"type,point1_x,point1_y,point2_x,point2_y\n", fp);
-
-	for (auto connect : breadBoard.connections) {
-		fputs(connect.type.c_str(), fp);
-		fputs(",", fp);
-		fputs(to_string(connect.point1.x).c_str(), fp);
-		fputs(",", fp);
-		fputs(to_string(connect.point1.y).c_str(), fp);
-		fputs(",", fp);
-		fputs(to_string(connect.point2.x).c_str(), fp);
-		fputs(",", fp);
-		fputs(to_string(connect.point2.y).c_str(), fp);
-		fputs("\n", fp);
-	}
-
-	fclose(fp);
-
-	imshow("circuit", result);
-}
-
 void CSampleDlg::showCircuitDiagram() {
-	//SchemDraw d = SchemDraw();
-
-	//vector<Connection> connects, first;
-	//copy(breadBoard.connections.begin(), breadBoard.connections.end(), back_inserter(connects));
-	//copy(breadBoard.connections.begin(), breadBoard.connections.end(), back_inserter(first));
-	//vector<Connection> startVcc;
-	//Point currentBoard;
-	//vector<Point> pushPointBoard;
-	//Point currentCircuit = Point(0, 0);
-	//vector<Point> pushPointCircuit;
-
-	//while (!first.empty()) {
-	//	auto ite = first.begin();
-	//	Connection connect = *ite;
-	//	first.erase(ite);
-
-	//	if (connect.point1.y == 1 || connect.point2.y == 1) {
-	//		startVcc.push_back(connect);
-	//	}
-	//}
-
-	//if (startVcc.empty()) {
-	//	//throw "適切な回路が組まれていません。\nVccに繋がる線が無い";
-	//	return;
-	//}
-	//else if(startVcc.size() == 1) {
-	//	d.addVdd();
-	//}
-	//else {
-	//	d.addVdd();
-	//	d.addDot();
-	//	for (int i = 0; i < startVcc.size() - 1; i++) {
-	//		d.push();
-	//	}
-	//}
-
-	//while (!startVcc.empty()) {
-	//	auto c = find(connects.begin(), connects.end(), startVcc.at(0));
-	//	startVcc.erase(c);
-	//	Connection start = *c;
-	//	currentCircuit = Point(0, 0);
-	//	Connection currentConnect = start;
-	//	currentBoard = start.point1;
-	//	if (start.point1.y == 1)
-	//		currentBoard = start.point2;
-
-	//	while (1) {
-	//		//GND
-	//		if (currentBoard.y == 0 || currentBoard.y == 13) {
-	//			d.addGND();
-	//		}
-	//		int x = currentBoard.x;
-	//		
-	//		vector<int> yList;
-
-	//	}
-	//}
-
-	////d.addVdd();
-	////d.addDot();
-	////d.push();
-	////d.push();
-	////
-	////d.addPart(SchemDraw::Resister, SchemDraw::DOWN, L"R1");
-	////d.addPart(SchemDraw::LED, SchemDraw::DOWN, L"LED1");
-	////d.addDot();
-	////
-	////d.pop();
-	////d.addPart(SchemDraw::Line, SchemDraw::LEFT);
-	////d.addPart(SchemDraw::Resister, SchemDraw::DOWN, L"R2");
-	////d.addPart(SchemDraw::LED, SchemDraw::DOWN, L"LED2");
-	////d.addPart(SchemDraw::Line, SchemDraw::RIGHT);
-	////d.addDot();
-
-	////d.pop();
-	////d.addPart(SchemDraw::Line, SchemDraw::RIGHT);
-	////d.addPart(SchemDraw::Resister, SchemDraw::DOWN, L"R3");
-	////d.addPart(SchemDraw::LED, SchemDraw::DOWN, L"LED3");
-	////d.addPart(SchemDraw::Line, SchemDraw::LEFT);
-	////d.addDot();
-
-	////d.addGND();
-
-	////d.draw(RESULT_PATH);
-
 	//CSVに保存
 	CString fileName = "connects-parameter.csv"; //生成する回路図表示用のpythonファイル名
 	FILE* fp;
@@ -1428,6 +1290,7 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 			imwrite(partsPath + format("%d_", *label) + type + "_position.bmp", partPosition);
 			imwrite(partsPath + format("%d_", *label) + type + "_cut.bmp", partCut);
 			imwrite(partsPath + format("%d_", *label) + type + "_hsv.bmp", partHSV);
+			imwrite(partsPath + "position_" + format("%d_", *label) + "_" + type + ".bmp", partPosition);
 		}
 		//すでにPartsを登録済み
 		else {
@@ -1569,19 +1432,17 @@ bool CSampleDlg::checkHoleUsed(Point& hole, Mat& result, Mat labels, Mat status)
 
 void CSampleDlg::detectBoardHole(Mat input, Mat& result, Point leftTop, Mat labels, Mat status) {
 	result = input.clone();
-	//Point DIS_BOARD_TO_HOLE(80 * 1.5, 45 * 1.5);
-	//Point DIS_NEXT_HOLE(30 * 1.5, 30 * 1.5);
-	//int DIS_NEXT_LONG_X = 60 * 1.5;
-	//Point DIS_PLUS_TO_J(-11 * 1.5, 83 * 1.5);
-	//Point DIS_A_TO_MINUS(15 * 1.5, 83 * 1.5);
-	//int DIS_F_TO_E = 87 * 1.5;
 	int lineHeigth = 50;
 	Point DIS_BOARD_TO_HOLE(120, 67);
 	Point DIS_NEXT_HOLE(45, 45);
 	int DIS_NEXT_LONG_X = 90;
 	Point DIS_PLUS_TO_J(-16, 124 - lineHeigth);
-	Point DIS_A_TO_MINUS(22, 124 - lineHeigth);
+
+	//暫定処理
+	Point DIS_A_TO_MINUS(25, 130 - lineHeigth);
+	//Point DIS_A_TO_MINUS(25, 110 - lineHeigth);
 	int DIS_F_TO_E = 130;
+	//int DIS_F_TO_E = 80;
 
 	Point hole(leftTop.x + DIS_BOARD_TO_HOLE.x, leftTop.y + DIS_BOARD_TO_HOLE.y);
 	Point leftHole = hole;
@@ -1797,9 +1658,13 @@ HoleType CSampleDlg::saveHole(Point position) {
 	Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
 	int size = 25 * 1.5;
 	int x = usedHole.x - size;
+	if (x < 0) return HoleType::EDGE;
 	int y = usedHole.y - size;
+	if (y < 0) return HoleType::EDGE;
 	int w = usedHole.x + size;
+	if (w >= concatInput.cols) return HoleType::EDGE;
 	int h = usedHole.y + size;
+	if (h >= concatInput.rows) return HoleType::EDGE;
 
 	Mat holeRaw = Mat(concatInput, Rect(Point(x, y), Point(w, h))).clone();
 	String path = RESULT_PATH + "holes\\";
@@ -1891,14 +1756,17 @@ void CSampleDlg::getBoardRect(const Mat input, Rect& area) {
 	//HSV
 	Mat hsv;
 	cvtColor(input, hsv, CV_BGR2HSV);
-	Scalar sMin = Scalar(0, 0, 120);
+	Scalar sMin = Scalar(0, 0, 80);
 	Scalar sMax = Scalar(180, 100, 255);
 	Mat mask;
 	inRange(hsv, sMin, sMax, mask);
 
+	//クロージング処理
+	morphologyEx(mask, mask, MORPH_CLOSE, getStructuringElement(MORPH_RECT, Size(10, 10)));
+
 	//メディアンフィルタ
 	Mat median;
-	medianBlur(mask, median, 5);
+	medianBlur(mask, median, 9);
 
 	//矩形探索
 	area = boundingRect(median);
@@ -2282,16 +2150,21 @@ void CSampleDlg::OnGetImage()
 	//カメラから取得
 	videoCapture.read(input);
 
-	//RGB格納
-	for (int i = 0; i < HEIGHT; i++) {
-		for (int j = 0; j < WIDTH; j++) {
-			m_ChangeImage->B[i][j] = input.ptr(i)[j * 3];
-			m_ChangeImage->G[i][j] = input.ptr(i)[j * 3 + 1];
-			m_ChangeImage->R[i][j] = input.ptr(i)[j * 3 + 2];
-		}
-	}
+	Mat showResult;
+	resize(input, showResult, Size(), 0.5, 0.5);
 
-	UpdateImage();
+	imshow("show", showResult);
+
+	////RGB格納
+	//for (int i = 0; i < HEIGHT; i++) {
+	//	for (int j = 0; j < WIDTH; j++) {
+	//		m_ChangeImage->B[i][j] = input.ptr(i)[j * 3];
+	//		m_ChangeImage->G[i][j] = input.ptr(i)[j * 3 + 1];
+	//		m_ChangeImage->R[i][j] = input.ptr(i)[j * 3 + 2];
+	//	}
+	//}
+
+	//UpdateImage();
 }
 
 bool CSampleDlg::initCamera() {
