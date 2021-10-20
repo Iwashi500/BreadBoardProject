@@ -860,9 +860,9 @@ void CSampleDlg::OnTest()
 	initSystem();
 	String path = RESULT_PATH;
 
-	if (!videoCapture.isOpened())
-		initCamera();
-	videoCapture.read(input);
+	//if (!videoCapture.isOpened())
+	//	initCamera();
+	//videoCapture.read(input);
 	if (input.empty()) {
 		String inputPath = RESULT_PATH + "input.bmp";
 		input = imread(inputPath, 1);
@@ -923,6 +923,7 @@ void CSampleDlg::OnTest()
 	//HSV
 	Mat hsv;
 	cvtColor(concatInput, hsv, CV_BGR2HSV);
+	//Scalar sMin = Scalar(0, 0, 130);
 	Scalar sMin = Scalar(0, 0, 130);
 	Scalar sMax = Scalar(180, 20, 255);
 	Mat mask;
@@ -949,7 +950,7 @@ void CSampleDlg::OnTest()
 	Mat labels, stats, centroids;
 	int nLab = connectedComponentsWithStats(reverse, labels, stats, centroids, 4, CV_32S);
 	Mat filLabels = labels.clone();
-	int borderMax = 500;
+	int borderMax = 600;
 	int borderMin = 90;
 	Mat filter;
 	reverse.copyTo(filter);
@@ -1655,6 +1656,10 @@ void CSampleDlg::judgeHoleType(Mat input, Mat& result) {
 }
 
 HoleType CSampleDlg::saveHole(Point position) {
+	int d = 0;
+	if (position.y == 1 && position.x == 7)
+		d++;
+
 	Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
 	int size = 25 * 1.5;
 	int x = usedHole.x - size;
@@ -1702,13 +1707,9 @@ HoleType CSampleDlg::saveHole(Point position) {
 		Mat labels, status, centroids;
 		connectedComponentsWithStats(range_rev, labels, status, centroids, 8, CV_32S);
 		int* label = labels.ptr<int>(size, size);
-		//connectedComponentsWithStats(range, labels, status, centroids, 4, CV_32S);
-
-		//int* label = labels.ptr<int>(size, size);
-		//if (*label == 0)
-		//	connectedComponentsWithStats(range_rev, labels, status, centroids, 4, CV_32S);
-		//else
-		//	printf("");
+		Mat cutLabel;
+		Scalar u = Scalar(*label, *label, *label);
+		inRange(labels, u, u, cutLabel);
 
 		int* param = status.ptr<int>(*label);
 		int left = param[ConnectedComponentsTypes::CC_STAT_LEFT];
@@ -1731,8 +1732,35 @@ HoleType CSampleDlg::saveHole(Point position) {
 			if (down == size * 2)
 				edgeCount++;
 
-			if (edgeCount >= 2)
-				holeType.type = HoleType::MIDDLE;
+			if (edgeCount >= 2) {
+				vector<vector<Point>> contours;
+				vector<Vec4i> hierarchy;
+				findContours(cutLabel, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+
+				int edgeCount = 0;
+				bool currentEdge = false;
+				bool prevEdge = currentEdge;
+				bool startCount = true;
+				for (auto point : contours.at(0)) {
+					if (point.x == 0 || point.x == size * 2 - 1
+						|| point.y == 0 || point.y == size * 2 - 1)
+						currentEdge = true;
+					else
+						currentEdge = false;
+
+					if (startCount) 
+						startCount = false;	
+					else if (currentEdge != prevEdge)
+						edgeCount++;
+
+					prevEdge = currentEdge;
+				}
+
+				if(edgeCount == 2)
+					holeType.type = HoleType::EDGE;
+				else
+					holeType.type = HoleType::MIDDLE;
+			}
 			else if (edgeCount == 0) { //どの端にも達していないなら搭載なしと再判定
 				holeType.type = HoleType::EMPTY;
 				//TODO: holeをusedからunusedに移す
@@ -1743,7 +1771,8 @@ HoleType CSampleDlg::saveHole(Point position) {
 
 		//imwrite(path + holeName + "_range" + ".bmp", range);
 		imwrite(path + holeName + "_range_rev" + ".bmp", range_rev);
-		imwrite(path + holeName + "_labels" + ".bmp", labels);
+		//imwrite(path + holeName + "_labels" + ".bmp", labels);
+		imwrite(path + holeName + "_labels" + ".bmp", cutLabel);
 	}
 
 	//rectangle(holeRaw, Rect(Point(size - 2, size-2), Point(size+2, size+2)), Scalar(0, 0, 255));
@@ -1756,7 +1785,7 @@ void CSampleDlg::getBoardRect(const Mat input, Rect& area) {
 	//HSV
 	Mat hsv;
 	cvtColor(input, hsv, CV_BGR2HSV);
-	Scalar sMin = Scalar(0, 0, 80);
+	Scalar sMin = Scalar(0, 0, 130);
 	Scalar sMax = Scalar(180, 100, 255);
 	Mat mask;
 	inRange(hsv, sMin, sMax, mask);
