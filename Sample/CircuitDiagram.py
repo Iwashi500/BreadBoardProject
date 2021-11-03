@@ -150,6 +150,11 @@ for param in csv.values:
             position[point1.index()].start,
             position[point2.index()].start
         )
+    elif param[0] == "LED":
+        d += elm.LED().color(enable).endpoints(
+            position[point1.index()].start,
+            position[point2.index()].start
+        )
 
     drawGND(d, point1, point2)
     drawVDD(d, point1, point2)

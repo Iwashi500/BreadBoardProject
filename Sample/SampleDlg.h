@@ -117,7 +117,7 @@ public:
 	void resetFileIndex() { fileIndex = 0; }
 	void cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat status);
 	void initSystem();
-	String judgePartsType(Mat input, int size);
+	PartType judgePartType(Mat input, int size);
 	void deleteResultFile();
 	bool checkHoleUsed(Point& hole, Mat& result, Mat labels, Mat status);
 	void reCheckHoleUsed(Mat& result, Mat labels, Mat status);

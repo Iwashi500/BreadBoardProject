@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <opencv2/opencv.hpp>
+#include "PartType.h"
 using namespace cv;
 using namespace std;
 
@@ -11,13 +12,14 @@ public:
 	Mat mat;
 	Rect position; //ç∂è„ç¿ïW
 	vector<Point> holes;
-	String type;
-
-	Part(Mat mat, Rect position, int size, String type) {
+	//String type;
+	PartType partType;
+	
+	Part(Mat mat, Rect position, int size, PartType type) {
 		this->mat = mat;
 		this->position = position;
 		this->size = size;
-		this->type = type;
+		this->partType = type;
 	}
 
 	void addHole(Point hole) {

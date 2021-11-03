@@ -8,6 +8,7 @@
 #include "SampleDlg.h"
 #include "SchemDraw.h"
 #include "afxdialogex.h"
+#include "PartType.h"
 #include "iostream"
 #include <time.H>
 #include <string>
@@ -896,12 +897,12 @@ void CSampleDlg::OnTest()
 
 	//上下線を除去して結合
 	Rect t1r = boardArea;
-	t1r.height = TOP_TO_LINT_DIS;
+	t1r.height = topLine.y - boardArea.y;
 	Rect t2r = boardArea;
-	t2r.y += TOP_TO_LINT_DIS + LINE_HEIGHT + 5;
-	t2r.height = 635 - 10;
+	t2r.y = topLine.y + topLine.height;
+	t2r.height = downLine.y - t2r.y;
 	Rect t3r = t1r;
-	t3r.y = boardArea.y + boardArea.height - TOP_TO_LINT_DIS;
+	t3r.y = downLine.y + downLine.height;
 	Mat t1 = Mat(input, t1r);
 	Mat t2 = Mat(input, t2r);
 	Mat t3 = Mat(input, t3r);
@@ -1056,7 +1057,7 @@ void CSampleDlg::showCircuitDiagram() {
 	//fputws(L"type,point1_x,point1_y,point2_x,point2_y\n", fp);
 
 	for (auto connect : breadBoard.connections) {
-		fputs(connect.type.c_str(), fp);
+		fputs(connect.type.toString().c_str(), fp);
 		fputs(",", fp);
 		fputs(to_string(connect.point1.x).c_str(), fp);
 		fputs(",", fp);
@@ -1073,8 +1074,10 @@ void CSampleDlg::showCircuitDiagram() {
 
 	//コマンドから実行
 	auto ret = system(nullptr);
-	if (ret == 0)
+	if (ret == 0) {
+		MessageBox(NULL, TEXT("コマンドが実行できません"), MB_OK);
 		return;
+	}
 	system("python CircuitDiagram.py");
 }
 
@@ -1103,10 +1106,12 @@ void CSampleDlg::drawLineConnect(Mat& result) {
 		Point hole1 = breadBoard.getHolePosition(connect.point1);
 		Point hole2 = breadBoard.getHolePosition(connect.point2);
 		Scalar color;
-		if (connect.type == "wire")
+		if (connect.type.type == PartType::WIRE)
 			color = GREEN;
-		else if (connect.type == "resistor")
+		else if (connect.type.type == PartType::RESISTOR)
 			color = YELLOW;
+		else if (connect.type.type == PartType::LED)
+			color = BLUE;
 		else
 			color = RED;
 
@@ -1150,10 +1155,12 @@ void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
 		}
 
 		Scalar color;
-		if (connect.type == "wire")
+		if (connect.type.type == PartType::WIRE)
 			color = GREEN;
-		else if (connect.type == "resistor")
+		else if (connect.type.type == PartType::RESISTOR)
 			color = YELLOW;
+		else if (connect.type.type == PartType::LED)
+			color = BLUE;
 		else
 			color = RED;
 
@@ -1185,7 +1192,7 @@ void CSampleDlg::detectLineConnect() {
 				if (nextHoleType.type == HoleType::EDGE) {
 					Point nextHole = breadBoard.holePositions.at(nextY).at(position.x);
 					Point nextPosition = Point(position.x, position.y + i);
-					breadBoard.connections.push_back(Connection(position, nextPosition, "wire"));
+					breadBoard.connections.push_back(Connection(position, nextPosition, PartType::WIRE));
 					break;
 				}
 			}
@@ -1194,7 +1201,11 @@ void CSampleDlg::detectLineConnect() {
 
 	//次にパーツ毎
 	for (auto part : breadBoard.parts) {
-		if (part.type == "wire" || part.type == "resistor") {
+
+		//TODO: いる？
+		if(part.partType.type == PartType::WIRE
+			|| part.partType.type == PartType::RESISTOR
+			|| part.partType.type == PartType::LED){
 			vector<Point> edges;
 			//端の穴をすべて取得
 			for (auto position : part.holes) {
@@ -1208,7 +1219,7 @@ void CSampleDlg::detectLineConnect() {
 			//端の穴をすべてつなげる
 			for (int i = 0; i < edges.size() - 1; i++) {
 				for (int j = i + 1; j < edges.size(); j++) {
-					breadBoard.connections.push_back(Connection(edges.at(i), edges.at(j), part.type));
+					breadBoard.connections.push_back(Connection(edges.at(i), edges.at(j), part.partType));
 				}
 			}
 		}
@@ -1276,7 +1287,7 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 			}
 
 			//パーツ種類判定
-			String type = judgePartsType(partCut, partSize);
+			PartType type = judgePartType(partCut, partSize);
 
 			//パーツ登録
 			Part part = Part(partRaw.clone(), area, partSize, type);
@@ -1286,12 +1297,12 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 			index++;
 
 			//画像保存
-			imwrite(partsPath + format("%d_", *label) + type + "_raw.bmp", partRaw);
-			imwrite(partsPath + format("%d_", *label) + type + "_mask.bmp", partMask);
-			imwrite(partsPath + format("%d_", *label) + type + "_position.bmp", partPosition);
-			imwrite(partsPath + format("%d_", *label) + type + "_cut.bmp", partCut);
-			imwrite(partsPath + format("%d_", *label) + type + "_hsv.bmp", partHSV);
-			imwrite(partsPath + "position_" + format("%d_", *label) + "_" + type + ".bmp", partPosition);
+			imwrite(partsPath + format("%d_", *label) + type.toString() + "_raw.bmp", partRaw);
+			imwrite(partsPath + format("%d_", *label) + type.toString() + "_mask.bmp", partMask);
+			imwrite(partsPath + format("%d_", *label) + type.toString() + "_position.bmp", partPosition);
+			imwrite(partsPath + format("%d_", *label) + type.toString() + "_cut.bmp", partCut);
+			imwrite(partsPath + format("%d_", *label) + type.toString() + "_hsv.bmp", partHSV);
+			imwrite(partsPath + "position_" + format("%d_", *label) + "_" + type.toString() + ".bmp", partPosition);
 		}
 		//すでにPartsを登録済み
 		else {
@@ -1302,11 +1313,12 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 	}
 }
 
-String CSampleDlg::judgePartsType(Mat input, int size) {
+PartType CSampleDlg::judgePartType(Mat input, int size) {
+	//PartType type;
 	Mat hsv;
 	cvtColor(input, hsv, CV_RGB2HSV);
-	String result = "resistor";
 
+	//単色判定(銅線)
 	for (int r = 0; r < 36; r++) {
 		int range = r * 5;
 		Scalar hmin = Scalar(range, 1, 1);
@@ -1328,12 +1340,38 @@ String CSampleDlg::judgePartsType(Mat input, int size) {
 
 		float ratio = 0.8;
 		if (count >= size * ratio) {
-			result = "wire";
-			break;
+			return PartType::WIRE;
 		}
 	}
 
-	return result;
+	//テンプレートマッチング
+	Scalar mask_min(1, 1, 1);
+	Scalar mask_max(255, 255, 255);
+	Mat input_mask;
+	inRange(input, mask_min, mask_max, input_mask);
+	cvtColor(input_mask, input_mask, CV_GRAY2BGR);
+	Mat temp_resistor, temp_LED, temp_result;
+	temp_resistor = imread("./res/template/resistor_mask.bmp");
+	temp_LED = imread("./res/template/LED_mask.bmp");
+	cv::Point max_pt;
+	double resistorMaxVal;
+	double LEDMaxVal;
+
+	matchTemplate(input_mask, temp_resistor, temp_result, CV_TM_CCOEFF_NORMED);
+	cv::minMaxLoc(temp_result, NULL, &resistorMaxVal, NULL, &max_pt);
+
+	matchTemplate(input_mask, temp_LED, temp_result, CV_TM_CCOEFF_NORMED);
+	cv::minMaxLoc(temp_result, NULL, &LEDMaxVal, NULL, &max_pt);
+
+	if (resistorMaxVal > LEDMaxVal) {
+		return PartType::RESISTOR;
+	}
+	else {
+		return PartType::LED;
+	}
+
+	//エラー用のもの作る？
+	return PartType::WIRE;
 }
 
 /// <summary>
@@ -1347,6 +1385,9 @@ String CSampleDlg::judgePartsType(Mat input, int size) {
 ///		未使用:false
 /// </returns>
 bool CSampleDlg::checkHoleUsed(Point& hole, Mat& result, Mat labels, Mat status) {
+	if (hole.x >= labels.cols || hole.y >= labels.rows)
+		return false;
+
 	//穴があったら表示　+　補正
 	int* label = labels.ptr<int>(hole.y, hole.x);
 	if (*label != 0) {

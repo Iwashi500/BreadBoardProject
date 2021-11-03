@@ -198,6 +198,7 @@
   <ItemGroup>
     <ClInclude Include="BreadBoard.h" />
     <ClInclude Include="Connection.h" />
+    <ClInclude Include="PartType.h" />
     <ClInclude Include="SchemDraw.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="HoleType.h" />
@@ -215,6 +216,7 @@
   <ItemGroup>
     <ClCompile Include="BreadBoard.cpp" />
     <ClCompile Include="Connection.cpp" />
+    <ClCompile Include="PartType.cpp" />
     <ClCompile Include="SchemDraw.cpp" />
     <ClCompile Include="HoleType.cpp" />
     <ClCompile Include="Image.cpp" />
