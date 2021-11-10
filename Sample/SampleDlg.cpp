@@ -983,16 +983,16 @@ void CSampleDlg::OnTest()
 	Point leftTop(boardArea.x, boardArea.y);
 
 	//搭載穴の検出
-	Mat holeResult;
-	detectBoardHole(hole, holeResult, Point(0, 0), filLabels, stats);
+	Mat holeDetect;
+	detectBoardHole(hole, holeDetect, Point(0, 0), filLabels, stats);
 
 	//搭載穴の判別
-	Mat holeTypeResult;
-	judgeHoleType(holeResult, holeTypeResult);
+	Mat ht;
+	judgeHoleType(holeDetect, ht);
 
 	//穴の状態の画像生成
-	Mat resultType = concatInput.clone();
-	drawHoleType(resultType);
+	Mat holeType = concatInput.clone();
+	drawHoleType(holeType);
 
 	//部品の抜き出し
 	Mat parts;
@@ -1004,10 +1004,15 @@ void CSampleDlg::OnTest()
 	Mat lineConnect = concatInput.clone();
 	detectLineConnect();
 	drawLineConnect(lineConnect);
+
+	////結果画像生成
+	//最終の搭載穴判定画像
+	Mat holeTypeResult = concatInput.clone();
+	drawHoleType(holeTypeResult);
+	//input画像への配線検出結果
 	Mat lineConnectInput;
 	drawLineConnectInput(lineConnectInput, Point(boardArea.x, boardArea.y));
 
-	////結果画像生成
 	//Mat holeOnly, resultMask;
 	//absdiff(hole, holeTypeResult, holeOnly);
 	//inRange(holeOnly, Scalar(0, 0, 0), Scalar(1, 1, 1), resultMask);
@@ -1035,10 +1040,11 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", getFileIndex()) + "filLabels.bmp", filLabels);
 	imwrite(path + format("%d_", getFileIndex()) + "filter.bmp", filter);
 	imwrite(path + format("%d_", getFileIndex()) + "hole.bmp", hole);
-	imwrite(path + format("%d_", getFileIndex()) + "holeResult.bmp", holeResult);
-	imwrite(path + format("%d_", getFileIndex()) + "holeTypeResult.bmp", holeTypeResult);
-	imwrite(path + format("%d_", getFileIndex()) + "resultType.bmp", resultType);
+	imwrite(path + format("%d_", getFileIndex()) + "holeDetect.bmp", holeDetect);
+	//imwrite(path + format("%d_", getFileIndex()) + "holeTypeResult.bmp", holeTypeResult);
+	imwrite(path + format("%d_", getFileIndex()) + "holeType.bmp", holeType);
 	imwrite(path + format("%d_", getFileIndex()) + "lineConnect.bmp", lineConnect);
+	imwrite(path + format("%d_", getFileIndex()) + "holeTypeResult.bmp", holeTypeResult);
 	imwrite(path + format("%d_", getFileIndex()) + "lineConnectInput.bmp", lineConnectInput);
 	//imwrite(path + format("%d_", getFileIndex()) + "result.bmp", result);
 }
@@ -1202,7 +1208,7 @@ void CSampleDlg::detectLineConnect() {
 	//次にパーツ毎
 	for (auto part : breadBoard.parts) {
 
-		//TODO: いる？
+		//２端子パーツ
 		if(part.partType.type == PartType::WIRE
 			|| part.partType.type == PartType::RESISTOR
 			|| part.partType.type == PartType::LED){
@@ -1216,7 +1222,16 @@ void CSampleDlg::detectLineConnect() {
 			if (edges.size() <= 1)
 				continue;
 
-			//端の穴をすべてつなげる
+			if (edges.size() == 2) {
+				if(part.partType.type != PartType::LED)
+					breadBoard.connections.push_back(Connection(edges.at(0), edges.at(1), part.partType));
+				else {
+					//TODO:+-判定
+					//いったんGUIでの入力？
+
+				}
+			}
+			//TODO:2端子出ないエラーはいったん置いとく
 			for (int i = 0; i < edges.size() - 1; i++) {
 				for (int j = i + 1; j < edges.size(); j++) {
 					breadBoard.connections.push_back(Connection(edges.at(i), edges.at(j), part.partType));
@@ -1287,7 +1302,7 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 			}
 
 			//パーツ種類判定
-			PartType type = judgePartType(partCut, partSize);
+			PartType type = judgePartType(partCut, partSize, area);
 
 			//パーツ登録
 			Part part = Part(partRaw.clone(), area, partSize, type);
@@ -1313,7 +1328,7 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 	}
 }
 
-PartType CSampleDlg::judgePartType(Mat input, int size) {
+PartType CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 	//PartType type;
 	Mat hsv;
 	cvtColor(input, hsv, CV_RGB2HSV);
@@ -1367,11 +1382,40 @@ PartType CSampleDlg::judgePartType(Mat input, int size) {
 		return PartType::RESISTOR;
 	}
 	else {
+		//頭頂部の端穴を削除
+		Rect roi(max_pt.x, max_pt.y, temp_LED.cols, temp_LED.rows);
+		removeLEDTop(roi, area);
+
 		return PartType::LED;
 	}
 
 	//エラー用のもの作る？
 	return PartType::WIRE;
+}
+
+void CSampleDlg::removeLEDTop(Rect roi, Rect partArea) {
+	Rect area = roi;
+	area.x += partArea.x;
+	area.y += partArea.y;
+
+	for (int i = 0; i < 14; i++) {
+		int row = 30;
+		if (i < 2 || 11 < i)
+			row = 25;
+		for (int j = 0; j < row; j++) {
+			HoleType type = breadBoard.holeTypes.at(i).at(j);
+			
+			if (type.type == HoleType::EDGE) {
+				Point hole = breadBoard.holePositions.at(i).at(j);
+				if (area.x <= hole.x && hole.x <= area.x + area.width
+					&& area.y <= hole.y && hole.y <= area.y + area.height) {
+
+					breadBoard.holeTypes.at(i).at(j) = HoleType::MIDDLE;
+				}
+
+			}
+		}
+	}
 }
 
 /// <summary>
