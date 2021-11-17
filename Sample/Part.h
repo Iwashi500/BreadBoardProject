@@ -10,9 +10,8 @@ class Part
 public:
 	int size;
 	Mat mat;
-	Rect position; //左上座標
+	Rect position; //パーツ画像の領域
 	vector<Point> holes;
-	//String type;
 	PartType partType;
 	
 	Part(Mat mat, Rect position, int size, PartType type) {
@@ -24,8 +23,10 @@ public:
 
 	void addHole(Point hole) {
 		holes.push_back(hole);
+		size++;
 	}
 
 	Part(){}
+	virtual PartType getPartType() { return partType; }
 };
 

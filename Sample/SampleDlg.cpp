@@ -9,6 +9,7 @@
 #include "SchemDraw.h"
 #include "afxdialogex.h"
 #include "PartType.h"
+#include "PartLED.h"
 #include "iostream"
 #include <time.H>
 #include <string>
@@ -43,6 +44,23 @@
 
 using namespace cv;
 using namespace std;
+
+struct mouseParam
+{
+	int x;
+	int y;
+	int event;
+	int flags;
+};
+
+void callBackMouseFunc(int eventType, int x, int y, int flags, void* userdata) {
+	mouseParam* ptr = static_cast<mouseParam*> (userdata);
+
+	ptr->x = x;
+	ptr->y = y;
+	ptr->event = eventType;
+	ptr->flags = flags;
+}
 
 // アプリケーションのバージョン情報に使われる CAboutDlg ダイアログ
 class CAboutDlg : public CDialogEx
@@ -1209,12 +1227,12 @@ void CSampleDlg::detectLineConnect() {
 	for (auto part : breadBoard.parts) {
 
 		//２端子パーツ
-		if(part.partType.type == PartType::WIRE
-			|| part.partType.type == PartType::RESISTOR
-			|| part.partType.type == PartType::LED){
+		if(part->partType.type == PartType::WIRE
+			|| part->partType.type == PartType::RESISTOR
+			|| part->partType.type == PartType::LED){
 			vector<Point> edges;
 			//端の穴をすべて取得
-			for (auto position : part.holes) {
+			for (auto position : part->holes) {
 				HoleType holeType = breadBoard.getHoleType(position);
 				if (holeType.type == HoleType::EDGE)
 					edges.push_back(position);
@@ -1223,20 +1241,87 @@ void CSampleDlg::detectLineConnect() {
 				continue;
 
 			if (edges.size() == 2) {
-				if(part.partType.type != PartType::LED)
-					breadBoard.connections.push_back(Connection(edges.at(0), edges.at(1), part.partType));
+				if(part->partType.type != PartType::LED)
+					breadBoard.connections.push_back(Connection(edges.at(0), edges.at(1), part->partType));
 				else {
 					//TODO:+-判定
 					//いったんGUIでの入力？
+					breadBoard.connections.push_back(selectLEDAnode(part, edges.at(0), edges.at(1)));
+					/*PartLED* led = dynamic_cast<PartLED*>(part);
+					mouseParam mouseEvent;
+					Mat selectShow = led->mat.clone();
 
+					imshow("select anode(+)", led->mat);
+					setMouseCallback("select anode(+)", callBackMouseFunc, &mouseEvent);
+
+					while (1) {
+						cv::waitKey(20);
+						if (mouseEvent.event == cv::EVENT_LBUTTONDOWN) {
+							Point mouseClick = Point(mouseEvent.x, mouseEvent.y);
+							if(judgeLEDAnode(part, edges.at(0), edges.at(1), mouseClick))
+								breadBoard.connections.push_back(Connection(edges.at(0), edges.at(1), part->partType));
+							else
+								breadBoard.connections.push_back(Connection(edges.at(1), edges.at(0), part->partType));
+							break;
+						}
+					}*/
 				}
 			}
-			//TODO:2端子出ないエラーはいったん置いとく
-			for (int i = 0; i < edges.size() - 1; i++) {
-				for (int j = i + 1; j < edges.size(); j++) {
-					breadBoard.connections.push_back(Connection(edges.at(i), edges.at(j), part.partType));
+			else {
+				//TODO:2端子でないエラーはいったん置いとく
+				for (int i = 0; i < edges.size() - 1; i++) {
+					for (int j = i + 1; j < edges.size(); j++) {
+						breadBoard.connections.push_back(Connection(edges.at(i), edges.at(j), part->partType));
+					}
 				}
 			}
+		}
+	}
+}
+
+Connection CSampleDlg::selectLEDAnode(Part* part, Point p1, Point p2) {
+	String windowName = "select anode(+)";
+	//String windowAll = "all";
+
+	PartLED* led = dynamic_cast<PartLED*>(part);
+	mouseParam mouseEvent;
+	Point global = Point(part->position.x, part->position.y);
+	Point point1G = breadBoard.holePositions.at(p1.y).at(p1.x); //入力画像での位置
+	Point point1P = point1G - global;//パーツ画像での位置
+	Point point2G = breadBoard.holePositions.at(p2.y).at(p2.x);
+	Point point2P = point2G - global;
+
+
+	//全体画像生成
+	//むしろわかりにくい
+	//Mat all = concatInput.clone();
+	//rectangle(all, part->position, YELLOW, 2);
+	//imshow(windowAll, all);
+	//表示画像生成
+	Mat selectShow = led->mat.clone();
+	int rectSize = 10;
+	Rect area1 = Rect(Point(point1P.x - rectSize, point1P.y - rectSize), Point(point1P.x + rectSize, point1P.y + rectSize));
+	Rect area2 = Rect(Point(point2P.x - rectSize, point2P.y - rectSize), Point(point2P.x + rectSize, point2P.y + rectSize));
+	rectangle(selectShow, area1, YELLOW, 2);
+	rectangle(selectShow, area2, YELLOW, 2);
+	imshow(windowName, selectShow);
+	setMouseCallback(windowName, callBackMouseFunc, &mouseEvent);
+
+	//マウス操作
+	while (1) {
+		cv::waitKey(20);
+		if (mouseEvent.event == cv::EVENT_LBUTTONDOWN) {
+			destroyWindow(windowName);
+			//destroyWindow(windowAll);
+
+			Point mouseClick = Point(mouseEvent.x, mouseEvent.y) + global;
+			float p1Distance = norm(point1G - mouseClick);
+			float p2Distance = norm(point2G - mouseClick);
+
+			if (p1Distance < p2Distance)
+				return Connection(p1, p2, PartType::LED);
+			else
+				return Connection(p2, p1, PartType::LED);
 		}
 	}
 }
@@ -1302,11 +1387,25 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 			}
 
 			//パーツ種類判定
-			PartType type = judgePartType(partCut, partSize, area);
+			Mat head;
+			PartType type = judgePartType(partCut, partSize, area, head);
 
 			//パーツ登録
-			Part part = Part(partRaw.clone(), area, partSize, type);
-			part.addHole(position);
+			Part* part;
+			PartLED* l;
+			switch (type.type)
+			{
+			case PartType::LED:
+				part = new PartLED(partRaw.clone(), area, partSize, head);
+				break;
+			case PartType::RESISTOR:
+			case PartType::WIRE:
+			default:
+				part = new Part(partRaw.clone(), area, partSize, type);
+				break;
+			}
+			//Part part = Part(partRaw.clone(), area, partSize, type);
+			part->addHole(position);
 			breadBoard.parts.push_back(part);
 			labelIndex[*label] = index;
 			index++;
@@ -1322,13 +1421,13 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 		//すでにPartsを登録済み
 		else {
 			int partIndex = labelIndex[*label];
-			breadBoard.parts.at(partIndex).addHole(position);
+			breadBoard.parts.at(partIndex)->addHole(position);
 		}
 
 	}
 }
 
-PartType CSampleDlg::judgePartType(Mat input, int size, Rect area) {
+PartType CSampleDlg::judgePartType(Mat input, int size, Rect area, Mat& head) {
 	//PartType type;
 	Mat hsv;
 	cvtColor(input, hsv, CV_RGB2HSV);
@@ -1385,7 +1484,7 @@ PartType CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 		//頭頂部の端穴を削除
 		Rect roi(max_pt.x, max_pt.y, temp_LED.cols, temp_LED.rows);
 		removeLEDTop(roi, area);
-
+		head = Mat(input, roi);
 		return PartType::LED;
 	}
 

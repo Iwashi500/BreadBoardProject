@@ -16,7 +16,9 @@ public:
 	vector<Point> unusedHoles;
 	vector<vector<HoleType>> holeTypes;
 	vector<vector<Point>> holePositions;
-	vector<Part> parts;
+	//ダウンキャストのためにポインタで
+	//そもそも全部ポインタの方が良い？
+	vector<Part*> parts;
 	vector<Connection> connections;
 
 	static String getHoleName(Point position);

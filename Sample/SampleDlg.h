@@ -117,7 +117,7 @@ public:
 	void resetFileIndex() { fileIndex = 0; }
 	void cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat status);
 	void initSystem();
-	PartType judgePartType(Mat input, int size, Rect area);
+	PartType judgePartType(Mat input, int size, Rect area, Mat& head);
 	void removeLEDTop(Rect roi, Rect area);
 	void deleteResultFile();
 	bool checkHoleUsed(Point& hole, Mat& result, Mat labels, Mat status);
@@ -129,4 +129,5 @@ public:
 	void createTestBoard();
 	void drawParts(Mat& result);
 	void showCircuitDiagram();
+	Connection selectLEDAnode(Part* part, Point p1, Point p2);
 };
