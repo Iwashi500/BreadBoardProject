@@ -12,13 +12,15 @@ class PartLED : public Part
 {
 public:
     Mat head;
+    Point headPosition;
 
-    PartLED(Mat mat, Rect position, int size, Mat head) {
+    PartLED(Mat mat, Rect position, int size, Mat head, Point headPosition) {
         this->mat = mat;
         this->position = position;
         this->size = size;
         this->partType = PartType::LED;
         this->head = head;
+        this->headPosition = headPosition;
     }
 
     PartType getPartType() override { return PartType::LED; }

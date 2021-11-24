@@ -10,6 +10,7 @@
 #include "BreadBoard.h"
 #include <opencv2/opencv.hpp>
 #include "HoleType.h"
+#include "PartLED.h"
 #pragma once
 
 using namespace cv;
@@ -117,7 +118,7 @@ public:
 	void resetFileIndex() { fileIndex = 0; }
 	void cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat status);
 	void initSystem();
-	PartType judgePartType(Mat input, int size, Rect area, Mat& head);
+	PartType judgePartType(Mat input, int size, Rect area, Mat& head, Point& headPosition);
 	void removeLEDTop(Rect roi, Rect area);
 	void deleteResultFile();
 	bool checkHoleUsed(Point& hole, Mat& result, Mat labels, Mat status);
@@ -129,5 +130,6 @@ public:
 	void createTestBoard();
 	void drawParts(Mat& result);
 	void showCircuitDiagram();
-	Connection selectLEDAnode(Part* part, Point p1, Point p2);
+	Connection selectLEDAnode(PartLED* led, Point p1, Point p2);
+	boolean judgeLEDAnode(PartLED* led, Point p1, Point p2, Connection& connect);
 };

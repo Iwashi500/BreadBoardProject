@@ -948,12 +948,7 @@ void CSampleDlg::OnTest()
 	Mat mask;
 	inRange(hsv, sMin, sMax, mask);
 
-	//エッジ検出
-	Mat edge;
-	Canny(mask, edge, 200, 255);	
-
 	//収縮処理
-	//現在無くしてる
 	Mat erosion;
 	morphologyEx(mask, erosion, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(5, 5)));
 	//erosion = mask.clone();
@@ -1051,7 +1046,6 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", getFileIndex()) + "concat.bmp", concatInput);
 	imwrite(path + format("%d_", getFileIndex()) + "hsv.bmp", hsv);
 	imwrite(path + format("%d_", getFileIndex()) + "mask.bmp", mask);
-	imwrite(path + format("%d_", getFileIndex()) + "edge.bmp", edge);
 	imwrite(path + format("%d_", getFileIndex()) + "erosion.bmp", erosion);
 	imwrite(path + format("%d_", getFileIndex()) + "reverse.bmp", reverse);
 	imwrite(path + format("%d_", getFileIndex()) + "labels.bmp", labels);
@@ -1245,26 +1239,15 @@ void CSampleDlg::detectLineConnect() {
 					breadBoard.connections.push_back(Connection(edges.at(0), edges.at(1), part->partType));
 				else {
 					//TODO:+-判定
-					//いったんGUIでの入力？
-					breadBoard.connections.push_back(selectLEDAnode(part, edges.at(0), edges.at(1)));
-					/*PartLED* led = dynamic_cast<PartLED*>(part);
-					mouseParam mouseEvent;
-					Mat selectShow = led->mat.clone();
-
-					imshow("select anode(+)", led->mat);
-					setMouseCallback("select anode(+)", callBackMouseFunc, &mouseEvent);
-
-					while (1) {
-						cv::waitKey(20);
-						if (mouseEvent.event == cv::EVENT_LBUTTONDOWN) {
-							Point mouseClick = Point(mouseEvent.x, mouseEvent.y);
-							if(judgeLEDAnode(part, edges.at(0), edges.at(1), mouseClick))
-								breadBoard.connections.push_back(Connection(edges.at(0), edges.at(1), part->partType));
-							else
-								breadBoard.connections.push_back(Connection(edges.at(1), edges.at(0), part->partType));
-							break;
-						}
-					}*/
+					PartLED* led = dynamic_cast<PartLED*>(part);
+					Connection connect = Connection(Point(0, 0), Point(0, 0), PartType::LED);
+					if (judgeLEDAnode(led, edges.at(0), edges.at(1), connect)) {
+						breadBoard.connections.push_back(connect);
+					}
+					else {
+						//GUIでの入力
+						breadBoard.connections.push_back(selectLEDAnode(led, edges.at(0), edges.at(1)));
+					}
 				}
 			}
 			else {
@@ -1279,13 +1262,61 @@ void CSampleDlg::detectLineConnect() {
 	}
 }
 
-Connection CSampleDlg::selectLEDAnode(Part* part, Point p1, Point p2) {
+/// <summary>
+/// LEDのアノード側を判定する
+/// </summary>
+/// <param name="led">LEDパーツオブジェクト</param>
+/// <param name="p1">端の穴の一つ目</param>
+/// <param name="p2">端の穴の２つ目</param>
+/// <param name="connect">判定結果のConnectionオブジェクト</param>
+/// <returns>
+///		判定不可能：false
+///		判定可能：true　(connectの中身が判定結果に更新)
+/// </returns>
+boolean CSampleDlg::judgeLEDAnode(PartLED* led, Point p1, Point p2, Connection& connect) {
+	Point point1 = breadBoard.holePositions.at(p1.y).at(p1.x);
+	Point point2 = breadBoard.holePositions.at(p2.y).at(p2.x);
+
+	Point global = Point(led->position.x, led->position.y);
+	Point headG = led->headPosition + global;
+	Point headCenter = Point(led->head.cols / 2, led->head.rows / 2) + headG;
+
+	float p1Dis = norm(point1 - headCenter);
+	float p2Dis = norm(point2 - headCenter);
+	float borderCanJudge = 0;
+	
+	//imshow("input", led->mat);
+	//imshow("head", led->head);
+
+
+	if (p1Dis > p2Dis && p1Dis - p2Dis >= borderCanJudge) {
+		connect = Connection(p1, p2, PartType::LED);
+		return true;
+	}
+	else if (p2Dis > p1Dis && p2Dis - p1Dis >= borderCanJudge) {
+		connect = Connection(p2, p1, PartType::LED);
+		return true;
+	}
+
+	return false;
+}
+
+/// <summary>
+/// LEDのアノード側をGUI操作でユーザーに選択させる
+/// </summary>
+/// <param name="led">LEDパーツオブジェクト</param>
+/// <param name="p1">端の穴の一つ目</param>
+/// <param name="p2">端の穴の２つ目</param>
+/// <returns>
+///		アノード側をpoint1、カソード側をpoint2にしたConnectionオブジェクト
+/// </returns>
+Connection CSampleDlg::selectLEDAnode(PartLED* led, Point p1, Point p2) {
 	String windowName = "select anode(+)";
 	//String windowAll = "all";
 
-	PartLED* led = dynamic_cast<PartLED*>(part);
+	//PartLED* led = dynamic_cast<PartLED*>(part);
 	mouseParam mouseEvent;
-	Point global = Point(part->position.x, part->position.y);
+	Point global = Point(led->position.x, led->position.y);
 	Point point1G = breadBoard.holePositions.at(p1.y).at(p1.x); //入力画像での位置
 	Point point1P = point1G - global;//パーツ画像での位置
 	Point point2G = breadBoard.holePositions.at(p2.y).at(p2.x);
@@ -1388,7 +1419,8 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 
 			//パーツ種類判定
 			Mat head;
-			PartType type = judgePartType(partCut, partSize, area, head);
+			Point headPosition;
+			PartType type = judgePartType(partCut, partSize, area, head, headPosition);
 
 			//パーツ登録
 			Part* part;
@@ -1396,7 +1428,7 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 			switch (type.type)
 			{
 			case PartType::LED:
-				part = new PartLED(partRaw.clone(), area, partSize, head);
+				part = new PartLED(partRaw.clone(), area, partSize, head, headPosition);
 				break;
 			case PartType::RESISTOR:
 			case PartType::WIRE:
@@ -1427,7 +1459,7 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 	}
 }
 
-PartType CSampleDlg::judgePartType(Mat input, int size, Rect area, Mat& head) {
+PartType CSampleDlg::judgePartType(Mat input, int size, Rect area, Mat& head, Point& headPosition) {
 	//PartType type;
 	Mat hsv;
 	cvtColor(input, hsv, CV_RGB2HSV);
@@ -1471,13 +1503,23 @@ PartType CSampleDlg::judgePartType(Mat input, int size, Rect area, Mat& head) {
 	double resistorMaxVal;
 	double LEDMaxVal;
 
-	matchTemplate(input_mask, temp_resistor, temp_result, CV_TM_CCOEFF_NORMED);
-	cv::minMaxLoc(temp_result, NULL, &resistorMaxVal, NULL, &max_pt);
+	if (input_mask.rows >= temp_resistor.rows
+		&& input_mask.cols >= temp_resistor.cols) {
+		matchTemplate(input_mask, temp_resistor, temp_result, CV_TM_CCOEFF_NORMED);
+		cv::minMaxLoc(temp_result, NULL, &resistorMaxVal, NULL, &max_pt);
+	}
+	else
+		resistorMaxVal = 0;
 
-	matchTemplate(input_mask, temp_LED, temp_result, CV_TM_CCOEFF_NORMED);
-	cv::minMaxLoc(temp_result, NULL, &LEDMaxVal, NULL, &max_pt);
+	if (input_mask.rows >= temp_LED.rows
+		&& input_mask.cols >= temp_LED.cols) {
+		matchTemplate(input_mask, temp_LED, temp_result, CV_TM_CCOEFF_NORMED);
+		cv::minMaxLoc(temp_result, NULL, &LEDMaxVal, NULL, &max_pt);
+	}
+	else
+		LEDMaxVal = 0;
 
-	if (resistorMaxVal > LEDMaxVal) {
+	if (resistorMaxVal >= LEDMaxVal) {
 		return PartType::RESISTOR;
 	}
 	else {
@@ -1485,6 +1527,7 @@ PartType CSampleDlg::judgePartType(Mat input, int size, Rect area, Mat& head) {
 		Rect roi(max_pt.x, max_pt.y, temp_LED.cols, temp_LED.rows);
 		removeLEDTop(roi, area);
 		head = Mat(input, roi);
+		headPosition = Point(roi.x, roi.y);
 		return PartType::LED;
 	}
 
@@ -1496,6 +1539,7 @@ void CSampleDlg::removeLEDTop(Rect roi, Rect partArea) {
 	Rect area = roi;
 	area.x += partArea.x;
 	area.y += partArea.y;
+	int areaExt = 20;
 
 	for (int i = 0; i < 14; i++) {
 		int row = 30;
@@ -1506,8 +1550,8 @@ void CSampleDlg::removeLEDTop(Rect roi, Rect partArea) {
 			
 			if (type.type == HoleType::EDGE) {
 				Point hole = breadBoard.holePositions.at(i).at(j);
-				if (area.x <= hole.x && hole.x <= area.x + area.width
-					&& area.y <= hole.y && hole.y <= area.y + area.height) {
+				if (area.x - areaExt <= hole.x && hole.x <= area.x + area.width + areaExt
+					&& area.y - areaExt <= hole.y && hole.y <= area.y + area.height + areaExt) {
 
 					breadBoard.holeTypes.at(i).at(j) = HoleType::MIDDLE;
 				}
