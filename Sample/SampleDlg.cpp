@@ -40,6 +40,8 @@
 #define GREEN Scalar(0, 255, 0)
 #define RED Scalar(0, 0, 255)
 #define YELLOW Scalar(0, 255, 255)
+#define PURPLE Scalar(255, 0, 255);
+#define LIGHTBLUE Scalar(255, 255, 0);
 #define WHITE Scalar(255, 255, 255)
 
 using namespace cv;
@@ -844,6 +846,7 @@ void CSampleDlg::deleteResultFile() {
 
 	deleteFileInDirectory(path + "holes");
 	deleteFileInDirectory(path + "parts");
+	deleteFileInDirectory(path + "temp");
 }
 
 void CSampleDlg::drawHoleType(Mat& result) {
@@ -1124,14 +1127,21 @@ void CSampleDlg::drawLineConnect(Mat& result) {
 		Point hole1 = breadBoard.getHolePosition(connect.point1);
 		Point hole2 = breadBoard.getHolePosition(connect.point2);
 		Scalar color;
-		if (connect.type.type == PartType::WIRE)
+		if (connect.type.type == PartType::WIRE) {
 			color = GREEN;
-		else if (connect.type.type == PartType::RESISTOR)
+		}
+		else if (connect.type.type == PartType::RESISTOR) {
 			color = YELLOW;
-		else if (connect.type.type == PartType::LED)
+		}
+		else if (connect.type.type == PartType::LED) {
 			color = BLUE;
-		else
+		}
+		else if (connect.type.type == PartType::CONDENSER) {
+			color = PURPLE;
+		}
+		else {
 			color = RED;
+		}
 
 		line(result, hole1, hole2, color, 3);
 		circle(result, hole1, 10, GREEN, -1);
@@ -1173,14 +1183,21 @@ void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
 		}
 
 		Scalar color;
-		if (connect.type.type == PartType::WIRE)
+		if (connect.type.type == PartType::WIRE) {
 			color = GREEN;
-		else if (connect.type.type == PartType::RESISTOR)
+		}
+		else if (connect.type.type == PartType::RESISTOR) {
 			color = YELLOW;
-		else if (connect.type.type == PartType::LED)
+		}
+		else if (connect.type.type == PartType::LED){
 			color = BLUE;
-		else
+		}
+		else if (connect.type.type == PartType::CONDENSER) {
+			color = PURPLE;
+		}
+		else {
 			color = RED;
+		}
 
 		line(result, hole1, hole2, color, 3);
 		circle(result, hole1, 10, GREEN, -1);
@@ -1223,7 +1240,8 @@ void CSampleDlg::detectLineConnect() {
 		//２端子パーツ
 		if(part->partType.type == PartType::WIRE
 			|| part->partType.type == PartType::RESISTOR
-			|| part->partType.type == PartType::LED){
+			|| part->partType.type == PartType::LED
+			|| part->partType.type == PartType::CONDENSER){
 			vector<Point> edges;
 			//端の穴をすべて取得
 			for (auto position : part->holes) {
@@ -1428,6 +1446,7 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 			switch (type.type)
 			{
 			case PartType::LED:
+			//case PartType::CONDENSER:
 				part = new PartLED(partRaw.clone(), area, partSize, head, headPosition);
 				break;
 			case PartType::RESISTOR:
@@ -1497,38 +1516,77 @@ PartType CSampleDlg::judgePartType(Mat input, int size, Rect area, Mat& head, Po
 	inRange(input, mask_min, mask_max, input_mask);
 	cvtColor(input_mask, input_mask, CV_GRAY2BGR);
 	Mat temp_resistor, temp_LED, temp_result;
+	Mat temp_con; //コンデンサー
 	temp_resistor = imread("./res/template/resistor_mask.bmp");
 	temp_LED = imread("./res/template/LED_mask.bmp");
-	cv::Point max_pt;
+	temp_con = imread("./res/template/condenser_mask.bmp");
+	Point resMaxPt;
+	Point LEDMaxPt;
+	Point conMaxPt;
 	double resistorMaxVal;
 	double LEDMaxVal;
+	double condenserMaxVal;
+	double maxVal;
+	String imagePath = RESULT_PATH + "temp\\";
+	String imageName = format("%d,%d", area.x ,area.y);
 
+	//抵抗のテンプレートマッチング
 	if (input_mask.rows >= temp_resistor.rows
 		&& input_mask.cols >= temp_resistor.cols) {
 		matchTemplate(input_mask, temp_resistor, temp_result, CV_TM_CCOEFF_NORMED);
-		cv::minMaxLoc(temp_result, NULL, &resistorMaxVal, NULL, &max_pt);
+		cv::minMaxLoc(temp_result, NULL, &resistorMaxVal, NULL, &resMaxPt);
 	}
 	else
 		resistorMaxVal = 0;
 
+	//LEDのテンプレートマッチング
 	if (input_mask.rows >= temp_LED.rows
 		&& input_mask.cols >= temp_LED.cols) {
 		matchTemplate(input_mask, temp_LED, temp_result, CV_TM_CCOEFF_NORMED);
-		cv::minMaxLoc(temp_result, NULL, &LEDMaxVal, NULL, &max_pt);
+		cv::minMaxLoc(temp_result, NULL, &LEDMaxVal, NULL, &LEDMaxPt);
 	}
 	else
 		LEDMaxVal = 0;
 
-	if (resistorMaxVal >= LEDMaxVal) {
+	//コンデンサーのテンプレートマッチング
+	if (input_mask.rows >= temp_con.rows
+		&& input_mask.cols >= temp_con.cols) {
+		matchTemplate(input_mask, temp_con, temp_result, CV_TM_CCOEFF_NORMED);
+		cv::minMaxLoc(temp_result, NULL, &condenserMaxVal, NULL, &conMaxPt);
+	}
+	else
+		LEDMaxVal = 0;
+
+	maxVal = max(LEDMaxVal, max(resistorMaxVal, condenserMaxVal));
+
+	if (resistorMaxVal == maxVal) {
+		Rect roi(resMaxPt.x, resMaxPt.y, temp_resistor.cols, temp_resistor.rows);
+		Mat templete = input.clone();
+		rectangle(templete, roi, RED, 2);
+		imwrite(imagePath + imageName + ".bmp", templete);
 		return PartType::RESISTOR;
 	}
-	else {
+	else if(LEDMaxVal == maxVal) {
 		//頭頂部の端穴を削除
-		Rect roi(max_pt.x, max_pt.y, temp_LED.cols, temp_LED.rows);
+		Rect roi(LEDMaxPt.x, LEDMaxPt.y, temp_LED.cols, temp_LED.rows);
+		Mat templete = input.clone();
+		rectangle(templete, roi, RED, 2);
+		imwrite(imagePath + imageName + ".bmp", templete);
 		removeLEDTop(roi, area);
 		head = Mat(input, roi);
 		headPosition = Point(roi.x, roi.y);
 		return PartType::LED;
+	}
+	else if (condenserMaxVal == maxVal) {
+		//頭頂部の端穴を削除
+		Rect roi(conMaxPt.x, conMaxPt.y, temp_con.cols, temp_con.rows);
+		Mat templete = input.clone();
+		rectangle(templete, roi, RED, 2);
+		imwrite(imagePath + imageName + ".bmp", templete);
+		removeLEDTop(roi, area);
+		head = Mat(input, roi);
+		headPosition = Point(roi.x, roi.y);
+		return PartType::CONDENSER;
 	}
 
 	//エラー用のもの作る？
@@ -2031,21 +2089,29 @@ void CSampleDlg::getBoardRect(const Mat input, Rect& area) {
 
 void CSampleDlg::OnHoukoku()
 {
-	String inputPath = RESULT_PATH + "hole.png";
-	input = imread(inputPath, 1);
+	String path = IWI_PATH;
+	Mat input = imread(path + "input.bmp");
 
-	Mat gray;
-	Scalar sMin = Scalar(0, 0, 250);
-	Scalar sMax = Scalar(180, 100, 255);
-	cvtColor(input, gray, CV_BGR2HSV);
-	inRange(gray, sMin, sMax, gray);
-	cv::bitwise_not(gray, gray);
+	//HSV
+	Mat hsv;
+	cvtColor(input, hsv, CV_BGR2HSV);
+	Scalar sMin = Scalar(5, 90, 150);
+	Scalar sMax = Scalar(12, 150, 255);
+	Mat mask;
+	inRange(hsv, sMin, sMax, mask);
 
-	Mat labels, stats, centroids;
-	int nLab = connectedComponentsWithStats(gray, labels, stats, centroids, 4, CV_32S);
+	Mat result;
+	input.copyTo(result, mask);
 
-	String path = RESULT_PATH;
-	imwrite(path + format("%d_", getFileIndex()) + "labels.bmp", labels);
+	Rect rect1 = Rect(890, 559, 123, 143);
+	rectangle(result, rect1, Scalar(0, 0, 255), 3);
+	rectangle(input, rect1, Scalar(0, 0, 255), 3);
+	imshow("result", result);
+
+	imwrite(path + "hsv.bmp", hsv);
+	imwrite(path + "mask.bmp", mask);
+	imwrite(path + "result.bmp", result);
+	imwrite(path + "result_input.bmp", input);
 }
 
 void CSampleDlg::drawOnLine(OnLine line) {

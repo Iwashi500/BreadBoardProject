@@ -45,7 +45,7 @@ public:
 
 	Mat input; //入力画像
 	Mat concatInput; //上下線除去後に接合した入力画像
-	int TOP_TO_LINT_DIS = 130; //ボードの頂点から、除去する線までの距離
+	int TOP_TO_LINT_DIS = 135; //ボードの頂点から、除去する線までの距離
 	int LINE_HEIGHT = 50; //除去する線の高さ
 	int MIDDLE_BOARD_HEIGHT = 635; //ボードの中央の高さ
 	UINT m_timerID;

@@ -11,7 +11,8 @@ public:
 	{
 		WIRE = 0,
 		RESISTOR = 1,
-		LED = 2
+		LED = 2,
+		CONDENSER = 3,
 	};
 
 	PartType() {}
@@ -32,6 +33,9 @@ public:
 			break;
 		case Type::LED:
 			return "LED";
+			break;
+		case Type::CONDENSER:
+			return "condenser";
 			break;
 		default:
 			return "unknown";

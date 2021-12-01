@@ -140,6 +140,7 @@ for param in csv.values:
     point1 = createPoint(param[1], param[2])
     point2 = createPoint(param[3], param[4])
 
+    # パーツ追加するごとに編集
     if param[0] == "wire":
         d += elm.Line().color(enable).endpoints(
             position[point1.index()].start,
@@ -152,6 +153,11 @@ for param in csv.values:
         )
     elif param[0] == "LED":
         d += elm.LED().color(enable).endpoints(
+            position[point1.index()].start,
+            position[point2.index()].start
+        )
+    elif param[0] == "condenser":
+        d += elm.Capacitor().color(enable).endpoints(
             position[point1.index()].start,
             position[point2.index()].start
         )
