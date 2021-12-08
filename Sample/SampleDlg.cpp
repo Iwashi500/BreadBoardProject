@@ -945,7 +945,6 @@ void CSampleDlg::OnTest()
 	//HSV
 	Mat hsv;
 	cvtColor(concatInput, hsv, CV_BGR2HSV);
-	//Scalar sMin = Scalar(0, 0, 130);
 	Scalar sMin = Scalar(0, 0, 130);
 	Scalar sMax = Scalar(180, 20, 255);
 	Mat mask;
@@ -1523,45 +1522,100 @@ PartType CSampleDlg::judgePartType(Mat input, int size, Rect area, Mat& head, Po
 	Point resMaxPt;
 	Point LEDMaxPt;
 	Point conMaxPt;
-	double resistorMaxVal;
-	double LEDMaxVal;
-	double condenserMaxVal;
-	double maxVal;
+	double resDeg;
+	double LEDDeg;
+	double conDeg;
+	double resistorMaxVal = 0;
+	double LEDMaxVal = 0;
+	double condenserMaxVal = 0;
+	double maxVal = 0;
 	String imagePath = RESULT_PATH + "temp\\";
 	String imageName = format("%d,%d", area.x ,area.y);
 
-	//抵抗のテンプレートマッチング
-	if (input_mask.rows >= temp_resistor.rows
-		&& input_mask.cols >= temp_resistor.cols) {
-		matchTemplate(input_mask, temp_resistor, temp_result, CV_TM_CCOEFF_NORMED);
-		cv::minMaxLoc(temp_result, NULL, &resistorMaxVal, NULL, &resMaxPt);
-	}
-	else
-		resistorMaxVal = 0;
 
-	//LEDのテンプレートマッチング
-	if (input_mask.rows >= temp_LED.rows
-		&& input_mask.cols >= temp_LED.cols) {
-		matchTemplate(input_mask, temp_LED, temp_result, CV_TM_CCOEFF_NORMED);
-		cv::minMaxLoc(temp_result, NULL, &LEDMaxVal, NULL, &LEDMaxPt);
-	}
-	else
-		LEDMaxVal = 0;
+	//テンプレ画像の回転
+	for (int i = 0; i < 36; i++) {
+		double degree = (double)i * 10;
+		Point resPt, LEDPt, conPt;
+		double resVal, LEDVal, conVal;
 
-	//コンデンサーのテンプレートマッチング
-	if (input_mask.rows >= temp_con.rows
-		&& input_mask.cols >= temp_con.cols) {
-		matchTemplate(input_mask, temp_con, temp_result, CV_TM_CCOEFF_NORMED);
-		cv::minMaxLoc(temp_result, NULL, &condenserMaxVal, NULL, &conMaxPt);
+		Mat temp_R, temp_C, temp_L;
+		Point2f center_R, center_C, center_L;
+		center_R = Point2f((temp_resistor.cols / 2), (temp_resistor.rows / 2));
+		center_C = Point2f((temp_con.cols / 2), (temp_con.rows / 2));
+		center_L = Point2f((temp_LED.cols / 2), (temp_LED.rows / 2));
+
+		Mat change_R, change_C, change_L;
+		change_R = getRotationMatrix2D(center_R, degree, 1.0);
+		change_C = getRotationMatrix2D(center_C, degree, 1.0);
+		change_L = getRotationMatrix2D(center_L, degree, 1.0);
+
+		int resSize = max(temp_resistor.rows, temp_resistor.cols);
+		int conSize = max(temp_con.rows, temp_con.cols);
+		int LEDSize = max(temp_LED.rows, temp_LED.cols);
+		warpAffine(temp_resistor, temp_R, change_R, Size(resSize, resSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+		warpAffine(temp_con, temp_C, change_C,  Size(conSize, conSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+		warpAffine(temp_LED, temp_L, change_L,  Size(LEDSize, LEDSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+
+		//抵抗のテンプレートマッチング
+		if (input_mask.rows >= temp_R.rows
+			&& input_mask.cols >= temp_R.cols) {
+			matchTemplate(input_mask, temp_R, temp_result, CV_TM_CCOEFF_NORMED);
+			cv::minMaxLoc(temp_result, NULL, &resVal, NULL, &resPt);
+			if (resVal > resistorMaxVal) {
+				resistorMaxVal = resVal;
+				resMaxPt = resPt;
+				resDeg = degree;
+			}
+		}
+
+		//LEDのテンプレートマッチング
+		if (input_mask.rows >= temp_L.rows
+			&& input_mask.cols >= temp_L.cols) {
+			matchTemplate(input_mask, temp_L, temp_result, CV_TM_CCOEFF_NORMED);
+			cv::minMaxLoc(temp_result, NULL, &LEDVal, NULL, &LEDPt);
+			if (LEDVal > LEDMaxVal) {
+				LEDMaxVal = LEDVal;
+				LEDMaxPt = LEDPt;
+				LEDDeg = degree;
+			}
+		}
+
+		//コンデンサーのテンプレートマッチング
+		if (input_mask.rows >= temp_C.rows
+			&& input_mask.cols >= temp_C.cols) {
+			matchTemplate(input_mask, temp_C, temp_result, CV_TM_CCOEFF_NORMED);
+			cv::minMaxLoc(temp_result, NULL, &conVal, NULL, &conPt);
+			if (conVal > condenserMaxVal) {
+				condenserMaxVal = conVal;
+				conMaxPt = conPt;
+				conDeg = degree;
+			}
+		}
 	}
-	else
-		LEDMaxVal = 0;
 
 	maxVal = max(LEDMaxVal, max(resistorMaxVal, condenserMaxVal));
 
+	if (maxVal == 0)
+		return PartType::WIRE;
+
 	if (resistorMaxVal == maxVal) {
+		//TODO: テンプレートした領域の描画
+		//Point vecX = Point(temp_resistor.cols * cos(resDeg * M_PI / 180), temp_resistor.cols * sin(resDeg * M_PI / 180));
+		//Point vecY = Point(-1 * temp_resistor.rows * sin(resDeg * M_PI / 180), temp_resistor.rows * cos(resDeg * M_PI / 180));
+
+		//Point p1 = Point(resMaxPt.x, resMaxPt.y);
+		//Point p2 = p1 + vecX;
+		//Point p3 = p2 + vecY;
+		//Point p4 = p3 - vecX;
+		//vector<Point> pts;
+		//pts.push_back(p1);
+		//pts.push_back(p2);
+		//pts.push_back(p3);
+		//pts.push_back(p4);
 		Rect roi(resMaxPt.x, resMaxPt.y, temp_resistor.cols, temp_resistor.rows);
 		Mat templete = input.clone();
+		//polylines(templete, pts, true, GREEN, 2);
 		rectangle(templete, roi, RED, 2);
 		imwrite(imagePath + imageName + ".bmp", templete);
 		return PartType::RESISTOR;
@@ -1579,13 +1633,13 @@ PartType CSampleDlg::judgePartType(Mat input, int size, Rect area, Mat& head, Po
 	}
 	else if (condenserMaxVal == maxVal) {
 		//頭頂部の端穴を削除
-		Rect roi(conMaxPt.x, conMaxPt.y, temp_con.cols, temp_con.rows);
-		Mat templete = input.clone();
-		rectangle(templete, roi, RED, 2);
-		imwrite(imagePath + imageName + ".bmp", templete);
-		removeLEDTop(roi, area);
-		head = Mat(input, roi);
-		headPosition = Point(roi.x, roi.y);
+		//Rect roi(conMaxPt.x, conMaxPt.y, temp_con.cols, temp_con.rows);
+		//Mat templete = input.clone();
+		//rectangle(templete, roi, RED, 2);
+		//imwrite(imagePath + imageName + ".bmp", templete);
+		//removeLEDTop(roi, area);
+		//head = Mat(input, roi);
+		//headPosition = Point(roi.x, roi.y);
 		return PartType::CONDENSER;
 	}
 
@@ -2089,29 +2143,9 @@ void CSampleDlg::getBoardRect(const Mat input, Rect& area) {
 
 void CSampleDlg::OnHoukoku()
 {
-	String path = IWI_PATH;
-	Mat input = imread(path + "input.bmp");
-
-	//HSV
-	Mat hsv;
-	cvtColor(input, hsv, CV_BGR2HSV);
-	Scalar sMin = Scalar(5, 90, 150);
-	Scalar sMax = Scalar(12, 150, 255);
-	Mat mask;
-	inRange(hsv, sMin, sMax, mask);
-
-	Mat result;
-	input.copyTo(result, mask);
-
-	Rect rect1 = Rect(890, 559, 123, 143);
-	rectangle(result, rect1, Scalar(0, 0, 255), 3);
-	rectangle(input, rect1, Scalar(0, 0, 255), 3);
-	imshow("result", result);
-
-	imwrite(path + "hsv.bmp", hsv);
-	imwrite(path + "mask.bmp", mask);
-	imwrite(path + "result.bmp", result);
-	imwrite(path + "result_input.bmp", input);
+	String path = RESULT_PATH;
+	Mat m = imread(path + "input.bmp");
+	imwrite(path + "temp/261.png", m);
 }
 
 void CSampleDlg::drawOnLine(OnLine line) {
