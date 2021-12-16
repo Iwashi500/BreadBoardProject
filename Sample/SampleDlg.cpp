@@ -10,6 +10,7 @@
 #include "afxdialogex.h"
 #include "PartType.h"
 #include "PartLED.h"
+#include "PartSwitch.h"
 #include "iostream"
 #include <time.H>
 #include <string>
@@ -1138,6 +1139,9 @@ void CSampleDlg::drawLineConnect(Mat& result) {
 		else if (connect.type.type == PartType::CONDENSER) {
 			color = PURPLE;
 		}
+		else if (connect.type.type == PartType::SWITCH) {
+			color = LIGHTBLUE;
+		}
 		else {
 			color = RED;
 		}
@@ -1193,6 +1197,9 @@ void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
 		}
 		else if (connect.type.type == PartType::CONDENSER) {
 			color = PURPLE;
+		}
+		else if (connect.type.type == PartType::SWITCH) {
+			color = LIGHTBLUE;
 		}
 		else {
 			color = RED;
@@ -1274,6 +1281,55 @@ void CSampleDlg::detectLineConnect() {
 						breadBoard.connections.push_back(Connection(edges.at(i), edges.at(j), part->partType));
 					}
 				}
+			}
+		}
+		//4端子パーツ
+		else if (part->partType.type == PartType::SWITCH) {
+			PartSwitch* swt = dynamic_cast<PartSwitch*>(part);
+			int top = INT_MAX;
+			int under = 0;
+			int left = INT_MAX;
+			int right = 0;
+
+			for (Point point : swt->holes) {
+				top = min(top, point.y);
+				under = max(under, point.y);
+				left = min(left, point.x);
+				right = max(right, point.x);
+			}
+			Point leftTop = Point(left, top);
+			Point leftUnder = Point(left, under);
+			Point rightTop = Point(right, top);
+			Point rightUnder = Point(right, under);
+			breadBoard.holeTypes.at(top).at(left) = HoleType::EDGE;
+			breadBoard.holeTypes.at(top).at(right) = HoleType::EDGE;
+			breadBoard.holeTypes.at(under).at(left) = HoleType::EDGE;
+			breadBoard.holeTypes.at(under).at(right) = HoleType::EDGE;
+			auto holes = swt->holes;
+			auto result = find(holes.begin(), holes.end(), leftTop);
+			if (result == holes.end())
+				swt->addHole(leftTop);
+			result = find(holes.begin(), holes.end(), leftUnder);
+			if (result == holes.end())
+				swt->addHole(leftUnder);
+			result = find(holes.begin(), holes.end(), rightTop);
+			if (result == holes.end())
+				swt->addHole(rightTop);
+			result = find(holes.begin(), holes.end(), rightUnder);
+			if (result == holes.end())
+				swt->addHole(rightUnder);
+
+			if ((int)(swt->degree) % 180 == 0) {
+				breadBoard.connections.push_back(Connection(leftTop, rightTop, PartType::SWITCH));
+				breadBoard.connections.push_back(Connection(leftUnder, rightUnder, PartType::SWITCH));
+				breadBoard.connections.push_back(Connection(leftTop, leftUnder, PartType::WIRE));
+				breadBoard.connections.push_back(Connection(rightTop, rightUnder, PartType::WIRE));
+			}
+			else {
+				breadBoard.connections.push_back(Connection(leftTop, leftUnder, PartType::SWITCH));
+				breadBoard.connections.push_back(Connection(rightTop, rightUnder, PartType::SWITCH));
+				breadBoard.connections.push_back(Connection(leftTop, rightTop, PartType::WIRE));
+				breadBoard.connections.push_back(Connection(leftUnder, rightUnder, PartType::WIRE));
 			}
 		}
 	}
@@ -1385,8 +1441,41 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 		Point usedHole = breadBoard.holePositions.at(position.y).at(position.x);
 
 		int* label = labels.ptr<int>(usedHole.y, usedHole.x);
-		if (*label == 0)
+		if (*label == 0) {
+			//背景画素のはずがないので、周りを探す。
+			int len = 10; //周り10の長さまで探す。
+			for (int l = 1; l <= len; l++) {
+				for (int i = 0; i < l; i++) {
+					//上下
+					if (i == 0 || i == len) {
+						for (int j = 0; j < l; j++) {
+							int* lab = labels.ptr<int>(usedHole.y + i - (len / 2), usedHole.x + j - (len / 2));
+							if (*lab != 0) {
+								label = lab;
+								goto SEARCHED;
+							}
+						}
+					}
+					//間
+					else {
+						int* lab = labels.ptr<int>(usedHole.y + i - (len / 2), usedHole.x - (len / 2));
+						if (*lab != 0) {
+							label = lab;
+							goto SEARCHED;
+						}
+						lab = labels.ptr<int>(usedHole.y + i - (len / 2), usedHole.x + (len / 2));
+						if (*lab != 0) {
+							label = lab;
+							goto SEARCHED;
+						}
+					}
+				}
+			}
+
 			continue;
+		}
+
+		SEARCHED:
 
 		decltype(saveLabel)::iterator it = saveLabel.find(*label);
 		if (it == saveLabel.end()) {
@@ -1435,26 +1524,9 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 			}
 
 			//パーツ種類判定
-			Mat head;
-			Point headPosition;
-			PartType type = judgePartType(partCut, partSize, area, head, headPosition);
-
-			//パーツ登録
-			Part* part;
-			PartLED* l;
-			switch (type.type)
-			{
-			case PartType::LED:
-			//case PartType::CONDENSER:
-				part = new PartLED(partRaw.clone(), area, partSize, head, headPosition);
-				break;
-			case PartType::RESISTOR:
-			case PartType::WIRE:
-			default:
-				part = new Part(partRaw.clone(), area, partSize, type);
-				break;
-			}
-			//Part part = Part(partRaw.clone(), area, partSize, type);
+			////パーツ登録
+			Part* part = judgePartType(partCut, partSize, area);
+			PartType type = part->getPartType();
 			part->addHole(position);
 			breadBoard.parts.push_back(part);
 			labelIndex[*label] = index;
@@ -1477,7 +1549,7 @@ void CSampleDlg::cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat stat
 	}
 }
 
-PartType CSampleDlg::judgePartType(Mat input, int size, Rect area, Mat& head, Point& headPosition) {
+Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 	//PartType type;
 	Mat hsv;
 	cvtColor(input, hsv, CV_RGB2HSV);
@@ -1504,63 +1576,98 @@ PartType CSampleDlg::judgePartType(Mat input, int size, Rect area, Mat& head, Po
 
 		float ratio = 0.8;
 		if (count >= size * ratio) {
-			return PartType::WIRE;
+			return new Part(input.clone(), area, size, PartType::WIRE);
 		}
 	}
 
-	//テンプレートマッチング
+	//テンプレートマッチング////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	Mat input_dst;
+	copyMakeBorder(input, input_dst, 90, 90, 90, 90, BORDER_CONSTANT, Scalar(0, 0, 0));
+
 	Scalar mask_min(1, 1, 1);
 	Scalar mask_max(255, 255, 255);
 	Mat input_mask;
-	inRange(input, mask_min, mask_max, input_mask);
+	inRange(input_dst, mask_min, mask_max, input_mask);
+	morphologyEx(input_mask, input_mask, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(5, 5)));
 	cvtColor(input_mask, input_mask, CV_GRAY2BGR);
+
 	Mat temp_resistor, temp_LED, temp_result;
 	Mat temp_con; //コンデンサー
+	Mat temp_switch;
 	temp_resistor = imread("./res/template/resistor_mask.bmp");
 	temp_LED = imread("./res/template/LED_mask.bmp");
 	temp_con = imread("./res/template/condenser_mask.bmp");
+	temp_switch = imread("./res/template/switch_mask.bmp");
+	//temp_switch = imread("./res/template/switch_temp.bmp");
 	Point resMaxPt;
 	Point LEDMaxPt;
 	Point conMaxPt;
+	Point swtMaxPt;
 	double resDeg;
 	double LEDDeg;
 	double conDeg;
+	double swtDeg;
 	double resistorMaxVal = 0;
 	double LEDMaxVal = 0;
 	double condenserMaxVal = 0;
+	double switchMaxVal = 0;
 	double maxVal = 0;
 	String imagePath = RESULT_PATH + "temp\\";
-	String imageName = format("%d,%d", area.x ,area.y);
+	String imageName = format("%d,%d", area.x, area.y);
+
+
+	//アフィン変換用のパラメータ(平行移動)
+	int resSize = max(temp_resistor.rows, temp_resistor.cols);
+	int conSize = max(temp_con.rows, temp_con.cols);
+	int LEDSize = max(temp_LED.rows, temp_LED.cols);
+	int swtSize = max(temp_switch.rows, temp_switch.cols);
+	Point2f center_R, center_C, center_L, center_S;
+	center_R = Point2f((resSize / 2), (resSize / 2));
+	center_C = Point2f((conSize / 2), (conSize / 2));
+	center_L = Point2f((LEDSize / 2), (LEDSize / 2));
+	center_S = Point2f((swtSize / 2), (swtSize / 2));
+	Mat move_R, move_C, move_L, move_S;
+	move_R = (Mat_<double>(2, 3) << 1, 0, center_R.x - temp_resistor.cols / 2,
+		0, 1, center_R.y - temp_resistor.rows / 2);
+	move_C = (Mat_<double>(2, 3) << 1, 0, center_C.x - temp_con.cols / 2,
+		0, 1, center_C.y - temp_con.rows / 2);
+	move_L = (Mat_<double>(2, 3) << 1, 0, center_L.x - temp_LED.cols / 2,
+		0, 1, center_L.y - temp_LED.rows / 2);
+	move_S = (Mat_<double>(2, 3) << 1, 0, center_S.x - temp_switch.cols / 2,
+		0, 1, center_S.y - temp_switch.rows / 2);
 
 
 	//テンプレ画像の回転
-	for (int i = 0; i < 36; i++) {
+	for (int i = 0; i < 1; i++) {
 		double degree = (double)i * 10;
-		Point resPt, LEDPt, conPt;
-		double resVal, LEDVal, conVal;
+		Point resPt, LEDPt, conPt, swtPt;
+		double resVal, LEDVal, conVal, swtVal;
 
-		Mat temp_R, temp_C, temp_L;
-		Point2f center_R, center_C, center_L;
-		center_R = Point2f((temp_resistor.cols / 2), (temp_resistor.rows / 2));
-		center_C = Point2f((temp_con.cols / 2), (temp_con.rows / 2));
-		center_L = Point2f((temp_LED.cols / 2), (temp_LED.rows / 2));
+		//アフィン変換用のパラメータ(回転)
+		Mat rotate_R, rotate_C, rotate_L, rotate_S;
+		rotate_R = getRotationMatrix2D(center_R, degree, 1.0);
+		rotate_C = getRotationMatrix2D(center_C, degree, 1.0);
+		rotate_L = getRotationMatrix2D(center_L, degree, 1.0);
+		rotate_S = getRotationMatrix2D(center_S, degree, 1.0);
 
-		Mat change_R, change_C, change_L;
-		change_R = getRotationMatrix2D(center_R, degree, 1.0);
-		change_C = getRotationMatrix2D(center_C, degree, 1.0);
-		change_L = getRotationMatrix2D(center_L, degree, 1.0);
+		Mat temp_R, temp_C, temp_L, temp_S;
+		//平行移動
+		warpAffine(temp_resistor, temp_R, move_R, Size(resSize, resSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+		warpAffine(temp_con, temp_C, move_C, Size(conSize, conSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+		warpAffine(temp_LED, temp_L, move_L, Size(LEDSize, LEDSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+		warpAffine(temp_switch, temp_S, move_S, Size(swtSize, swtSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+		//回転
+		warpAffine(temp_R, temp_R, rotate_R, Size(resSize, resSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+		warpAffine(temp_C, temp_C, rotate_C, Size(conSize, conSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+		warpAffine(temp_L, temp_L, rotate_L, Size(LEDSize, LEDSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+		warpAffine(temp_S, temp_S, rotate_S, Size(swtSize, swtSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
 
-		int resSize = max(temp_resistor.rows, temp_resistor.cols);
-		int conSize = max(temp_con.rows, temp_con.cols);
-		int LEDSize = max(temp_LED.rows, temp_LED.cols);
-		warpAffine(temp_resistor, temp_R, change_R, Size(resSize, resSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
-		warpAffine(temp_con, temp_C, change_C,  Size(conSize, conSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
-		warpAffine(temp_LED, temp_L, change_L,  Size(LEDSize, LEDSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+		int method = CV_TM_CCOEFF_NORMED;
 
 		//抵抗のテンプレートマッチング
 		if (input_mask.rows >= temp_R.rows
 			&& input_mask.cols >= temp_R.cols) {
-			matchTemplate(input_mask, temp_R, temp_result, CV_TM_CCOEFF_NORMED);
+			matchTemplate(input_mask, temp_R, temp_result, method);
 			cv::minMaxLoc(temp_result, NULL, &resVal, NULL, &resPt);
 			if (resVal > resistorMaxVal) {
 				resistorMaxVal = resVal;
@@ -1572,7 +1679,7 @@ PartType CSampleDlg::judgePartType(Mat input, int size, Rect area, Mat& head, Po
 		//LEDのテンプレートマッチング
 		if (input_mask.rows >= temp_L.rows
 			&& input_mask.cols >= temp_L.cols) {
-			matchTemplate(input_mask, temp_L, temp_result, CV_TM_CCOEFF_NORMED);
+			matchTemplate(input_mask, temp_L, temp_result, method);
 			cv::minMaxLoc(temp_result, NULL, &LEDVal, NULL, &LEDPt);
 			if (LEDVal > LEDMaxVal) {
 				LEDMaxVal = LEDVal;
@@ -1584,7 +1691,7 @@ PartType CSampleDlg::judgePartType(Mat input, int size, Rect area, Mat& head, Po
 		//コンデンサーのテンプレートマッチング
 		if (input_mask.rows >= temp_C.rows
 			&& input_mask.cols >= temp_C.cols) {
-			matchTemplate(input_mask, temp_C, temp_result, CV_TM_CCOEFF_NORMED);
+			matchTemplate(input_mask, temp_C, temp_result, method);
 			cv::minMaxLoc(temp_result, NULL, &conVal, NULL, &conPt);
 			if (conVal > condenserMaxVal) {
 				condenserMaxVal = conVal;
@@ -1592,59 +1699,65 @@ PartType CSampleDlg::judgePartType(Mat input, int size, Rect area, Mat& head, Po
 				conDeg = degree;
 			}
 		}
+
+		//スイッチのテンプレートマッチング
+		if (input_mask.rows >= temp_S.rows
+			&& input_mask.cols >= temp_S.cols) {
+			matchTemplate(input_mask, temp_S, temp_result, method);
+			cv::minMaxLoc(temp_result, NULL, &swtVal, NULL, &swtPt);
+			if (swtVal > switchMaxVal) {
+				switchMaxVal = swtVal;
+				swtMaxPt = swtPt;
+				swtDeg = degree;
+			}
+		}
 	}
 
-	maxVal = max(LEDMaxVal, max(resistorMaxVal, condenserMaxVal));
+	maxVal = max(switchMaxVal, max(LEDMaxVal, max(resistorMaxVal, condenserMaxVal)));
 
-	if (maxVal == 0)
-		return PartType::WIRE;
+	double border = 0.45;
+	if (maxVal < border)
+		return new Part(input.clone(), area, size, PartType::WIRE);
 
 	if (resistorMaxVal == maxVal) {
-		//TODO: テンプレートした領域の描画
-		//Point vecX = Point(temp_resistor.cols * cos(resDeg * M_PI / 180), temp_resistor.cols * sin(resDeg * M_PI / 180));
-		//Point vecY = Point(-1 * temp_resistor.rows * sin(resDeg * M_PI / 180), temp_resistor.rows * cos(resDeg * M_PI / 180));
-
-		//Point p1 = Point(resMaxPt.x, resMaxPt.y);
-		//Point p2 = p1 + vecX;
-		//Point p3 = p2 + vecY;
-		//Point p4 = p3 - vecX;
-		//vector<Point> pts;
-		//pts.push_back(p1);
-		//pts.push_back(p2);
-		//pts.push_back(p3);
-		//pts.push_back(p4);
 		Rect roi(resMaxPt.x, resMaxPt.y, temp_resistor.cols, temp_resistor.rows);
 		Mat templete = input.clone();
-		//polylines(templete, pts, true, GREEN, 2);
 		rectangle(templete, roi, RED, 2);
 		imwrite(imagePath + imageName + ".bmp", templete);
-		return PartType::RESISTOR;
+		return new Part(input.clone(), area, size, PartType::RESISTOR);
 	}
-	else if(LEDMaxVal == maxVal) {
+	else if (LEDMaxVal == maxVal) {
 		//頭頂部の端穴を削除
 		Rect roi(LEDMaxPt.x, LEDMaxPt.y, temp_LED.cols, temp_LED.rows);
-		Mat templete = input.clone();
+		Mat templete = input_dst.clone();
 		rectangle(templete, roi, RED, 2);
 		imwrite(imagePath + imageName + ".bmp", templete);
 		removeLEDTop(roi, area);
-		head = Mat(input, roi);
-		headPosition = Point(roi.x, roi.y);
-		return PartType::LED;
+		Mat head = Mat(input_dst, roi);
+		Point headPosition = Point(roi.x, roi.y);
+		return new PartLED(input.clone(), area, size, head, headPosition);
 	}
 	else if (condenserMaxVal == maxVal) {
 		//頭頂部の端穴を削除
-		//Rect roi(conMaxPt.x, conMaxPt.y, temp_con.cols, temp_con.rows);
-		//Mat templete = input.clone();
-		//rectangle(templete, roi, RED, 2);
-		//imwrite(imagePath + imageName + ".bmp", templete);
-		//removeLEDTop(roi, area);
-		//head = Mat(input, roi);
-		//headPosition = Point(roi.x, roi.y);
-		return PartType::CONDENSER;
+		Rect roi(conMaxPt.x, conMaxPt.y, temp_con.cols, temp_con.rows);
+		Mat templete = input_dst.clone();
+		rectangle(templete, roi, RED, 2);
+		imwrite(imagePath + imageName + ".bmp", templete);
+		removeLEDTop(roi, area);
+		Mat head = Mat(input_dst, roi);
+		Point headPosition = Point(roi.x, roi.y);
+		return new PartLED(input.clone(), area, size, head, headPosition);
+	}
+	else if (switchMaxVal == maxVal) {
+		Rect roi(resMaxPt.x, resMaxPt.y, temp_switch.cols, temp_switch.rows);
+		Mat templete = input.clone();
+		rectangle(templete, roi, RED, 2);
+		imwrite(imagePath + imageName + ".bmp", templete);
+		return new PartSwitch(input.clone(), area, size, swtDeg);
 	}
 
 	//エラー用のもの作る？
-	return PartType::WIRE;
+	return new Part(input.clone(), area, size, PartType::WIRE);
 }
 
 void CSampleDlg::removeLEDTop(Rect roi, Rect partArea) {
@@ -2125,7 +2238,7 @@ void CSampleDlg::getBoardRect(const Mat input, Rect& area) {
 	//HSV
 	Mat hsv;
 	cvtColor(input, hsv, CV_BGR2HSV);
-	Scalar sMin = Scalar(0, 0, 130);
+	Scalar sMin = Scalar(0, 0, 150);
 	Scalar sMax = Scalar(180, 100, 255);
 	Mat mask;
 	inRange(hsv, sMin, sMax, mask);
@@ -2137,15 +2250,37 @@ void CSampleDlg::getBoardRect(const Mat input, Rect& area) {
 	Mat median;
 	medianBlur(mask, median, 9);
 
+	//ラベリング
+	Mat labels, status, centroids;
+	connectedComponentsWithStats(median, labels, status, centroids, 8, CV_32S);
+	int maxSize = 0;
+	for (int i = 0; i < input.rows; i++) {
+		for (int j = 0; j < input.cols; j++) {
+			int* label = labels.ptr<int>(i, j);
+			int* param = status.ptr<int>(*label);
+			int size = param[ConnectedComponentsTypes::CC_STAT_AREA];
+			if (size > maxSize) {
+				maxSize = size;
+				area.x = param[ConnectedComponentsTypes::CC_STAT_LEFT];
+				area.y = param[ConnectedComponentsTypes::CC_STAT_TOP];
+				area.width = param[ConnectedComponentsTypes::CC_STAT_WIDTH];
+				area.height = param[ConnectedComponentsTypes::CC_STAT_HEIGHT];
+			}
+		}
+	}
+
 	//矩形探索
-	area = boundingRect(median);
+	//area = boundingRect(median);
 }
 
 void CSampleDlg::OnHoukoku()
 {
-	String path = RESULT_PATH;
-	Mat m = imread(path + "input.bmp");
-	imwrite(path + "temp/261.png", m);
+	Mat input = imread((String)RESULT_PATH + "4_concat.bmp", IMREAD_GRAYSCALE);
+	Mat edge;
+	Canny(input, edge, 10, 100);
+
+	imshow("edge", edge);
+	imwrite((String)RESULT_PATH + "edge.bmp", edge);
 }
 
 void CSampleDlg::drawOnLine(OnLine line) {

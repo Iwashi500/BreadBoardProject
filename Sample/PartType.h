@@ -13,6 +13,7 @@ public:
 		RESISTOR = 1,
 		LED = 2,
 		CONDENSER = 3,
+		SWITCH = 4,
 	};
 
 	PartType() {}
@@ -36,6 +37,9 @@ public:
 			break;
 		case Type::CONDENSER:
 			return "condenser";
+			break;
+		case Type::SWITCH:
+			return "switch";
 			break;
 		default:
 			return "unknown";

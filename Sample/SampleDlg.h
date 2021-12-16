@@ -118,7 +118,7 @@ public:
 	void resetFileIndex() { fileIndex = 0; }
 	void cutParts(Mat input, Mat& result, Mat mask, Mat labels, Mat status);
 	void initSystem();
-	PartType judgePartType(Mat input, int size, Rect area, Mat& head, Point& headPosition);
+	Part* judgePartType(Mat input, int size, Rect area);
 	void removeLEDTop(Rect roi, Rect area);
 	void deleteResultFile();
 	bool checkHoleUsed(Point& hole, Mat& result, Mat labels, Mat status);
