@@ -11,6 +11,7 @@
 #include "PartType.h"
 #include "PartLED.h"
 #include "PartSwitch.h"
+#include "PartCondenser.h"
 #include "iostream"
 #include <time.H>
 #include <string>
@@ -1582,7 +1583,8 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 
 	//テンプレートマッチング////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	Mat input_dst;
-	copyMakeBorder(input, input_dst, 90, 90, 90, 90, BORDER_CONSTANT, Scalar(0, 0, 0));
+	int extSize = 90; //拡張するサイズ
+	copyMakeBorder(input, input_dst, extSize, extSize, extSize, extSize, BORDER_CONSTANT, Scalar(0, 0, 0));
 
 	Scalar mask_min(1, 1, 1);
 	Scalar mask_max(255, 255, 255);
@@ -1614,6 +1616,12 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 	double maxVal = 0;
 	String imagePath = RESULT_PATH + "temp\\";
 	String imageName = format("%d,%d", area.x, area.y);
+
+	//画像の拡張に対して、areaを変更
+	area.x -= extSize;
+	area.y -= extSize;
+	area.width += extSize * 2;
+	area.height += extSize * 2;
 
 
 	//アフィン変換用のパラメータ(平行移動)
@@ -1746,7 +1754,7 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 		removeLEDTop(roi, area);
 		Mat head = Mat(input_dst, roi);
 		Point headPosition = Point(roi.x, roi.y);
-		return new PartLED(input.clone(), area, size, head, headPosition);
+		return new PartCondenser(input.clone(), area, size, head, headPosition);
 	}
 	else if (switchMaxVal == maxVal) {
 		Rect roi(resMaxPt.x, resMaxPt.y, temp_switch.cols, temp_switch.rows);

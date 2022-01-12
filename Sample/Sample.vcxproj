@@ -198,6 +198,7 @@
   <ItemGroup>
     <ClInclude Include="BreadBoard.h" />
     <ClInclude Include="Connection.h" />
+    <ClInclude Include="PartCondenser.h" />
     <ClInclude Include="PartLED.h" />
     <ClInclude Include="PartSwitch.h" />
     <ClInclude Include="PartType.h" />
@@ -218,6 +219,7 @@
   <ItemGroup>
     <ClCompile Include="BreadBoard.cpp" />
     <ClCompile Include="Connection.cpp" />
+    <ClCompile Include="PartCondenser.cpp" />
     <ClCompile Include="PartLED.cpp" />
     <ClCompile Include="PartSwitch.cpp" />
     <ClCompile Include="PartType.cpp" />

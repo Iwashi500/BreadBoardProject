@@ -157,7 +157,12 @@ for param in csv.values:
             position[point2.index()].start
         )
     elif param[0] == "condenser":
-        d += elm.Capacitor().color(enable).endpoints(
+        d += elm.Capacitor(polar=True).color(enable).endpoints(
+            position[point1.index()].start,
+            position[point2.index()].start
+        )
+    elif param[0] == "switch":
+        d += elm.Button().color(enable).endpoints(
             position[point1.index()].start,
             position[point2.index()].start
         )
