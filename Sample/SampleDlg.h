@@ -132,4 +132,5 @@ public:
 	void showCircuitDiagram();
 	Connection selectLEDAnode(PartLED* led, Point p1, Point p2);
 	boolean judgeLEDAnode(PartLED* led, Point p1, Point p2, Connection& connect);
+	afx_msg void OnCheckCircle();
 };

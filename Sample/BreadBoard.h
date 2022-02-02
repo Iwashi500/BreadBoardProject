@@ -26,6 +26,7 @@ public:
 	bool checkUsed(int y, int x);
 	bool checkUsed(Point position);
 	vector<Point>::iterator deleteUsedHole(Point hole);
+	bool checkIsConnect(Point p1, Point p2);
 
 	Point getHolePosition(Point position) {
 		return this->holePositions.at(position.y).at(position.x);
@@ -35,15 +36,21 @@ public:
 		return this->holeTypes.at(position.y).at(position.x);
 	}
 
-	/*void push(OnLine onLine) {
-		onLines.push_back(onLine);
-	}
+	enum ErrorType
+	{
+		//safe
+		NONE = 0,
 
-	std::list<OnLine> getOnLines() {
-		return this->onLines;
-	}
+		//warning
+		USELESS,
+		NO_VCC,
+		NO_CONDUCTION,
 
-	OnLine getOnLine(MyPoint point);*/
+		//error
+		SHORT,
+	};
+
+	ErrorType checkCircleError();
 };
 
 

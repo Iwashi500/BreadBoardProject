@@ -24,8 +24,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/imgproc/types_c.h>
 #include <atlpath.h> // CPathのため必要
-#include<iostream>
-#include<fstream>
+#include <iostream>
+#include <fstream>
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -176,6 +176,7 @@ BEGIN_MESSAGE_MAP(CSampleDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON14, &CSampleDlg::OnClosing)
 	ON_BN_CLICKED(IDC_BUTTON16, &CSampleDlg::OnCreateCutBoard)
 	ON_BN_CLICKED(IDC_BUTTON15, &CSampleDlg::OnHoukoku)
+	ON_BN_CLICKED(IDC_BUTTON37, &CSampleDlg::OnCheckCircle)
 END_MESSAGE_MAP()
 
 
@@ -878,15 +879,120 @@ void CSampleDlg::drawHoleType(Mat& result) {
 	}
 }
 
+void CSampleDlg::OnCheckCircle()
+{
+	//抵抗のみ直線
+	//breadBoard.connections.push_back(
+	//	Connection(Point(7, 1), Point(8, 2), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 2), Point(8, 7), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 7), Point(8, 8), PartType::RESISTOR));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 8), Point(7, 12), PartType::WIRE));
+
+	//LEDつき分岐なし
+	//breadBoard.connections.push_back(
+	//	Connection(Point(7, 1), Point(8, 2), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 2), Point(8, 7), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 7), Point(8, 8), PartType::RESISTOR));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 8), Point(8, 10), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 10), Point(12, 10), PartType::LED));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(12, 10), Point(10, 12), PartType::WIRE));
+
+	//VCC接続無し
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 2), Point(8, 7), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 7), Point(8, 8), PartType::RESISTOR));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 8), Point(8, 10), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 10), Point(12, 10), PartType::LED));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(12, 10), Point(10, 12), PartType::WIRE));
+
+	////銅線のみショート
+	//breadBoard.connections.push_back(
+	//	Connection(Point(7, 1), Point(8, 2), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 2), Point(8, 7), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 7), Point(8, 8), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 8), Point(7, 12), PartType::WIRE));
+
+	//スイッチ有ショート
+	//breadBoard.connections.push_back(
+	//	Connection(Point(7, 1), Point(8, 2), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 2), Point(8, 7), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 7), Point(10, 7), PartType::SWITCH));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(10, 7), Point(9, 12), PartType::WIRE));
+
+	//スイッチ・LEDショート
+	//breadBoard.connections.push_back(
+	//	Connection(Point(7, 1), Point(8, 2), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 2), Point(8, 7), PartType::LED));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 7), Point(10, 7), PartType::SWITCH));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(10, 7), Point(9, 12), PartType::WIRE));
+
+
+	//途切れあり
+	//breadBoard.connections.push_back(
+	//	Connection(Point(7, 1), Point(8, 2), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 2), Point(8, 7), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 7), Point(8, 8), PartType::RESISTOR));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 8), Point(7, 12), PartType::WIRE));
+	//breadBoard.connections.push_back(
+	//	Connection(Point(8, 8), Point(10, 8), PartType::WIRE));
+
+	BreadBoard::ErrorType et = breadBoard.checkCircleError();
+
+	switch (et)
+	{
+	case BreadBoard::NONE:
+		MessageBox(TEXT("回路は安全です。"), TEXT("OK"), MB_OK);
+		break;
+	case BreadBoard::SHORT:
+		MessageBox(TEXT("ショートしています。\n電源を接続しないでください。"), TEXT("危険！！！"), MB_OK);
+		break;
+	case BreadBoard::USELESS:
+		MessageBox(TEXT("どこにも接続されていない線があります。\n回路を確認してください。"), TEXT("注意"), MB_OK);
+		break;
+	case BreadBoard::NO_VCC:
+		MessageBox(TEXT("VCCに接続されていません。\n回路を確認してください。"), TEXT("注意"), MB_OK);
+		break;
+	case BreadBoard::NO_CONDUCTION:
+		MessageBox(TEXT("導通している線がありません。\n回路を確認してください。"), TEXT("注意"), MB_OK);
+	default:
+		break;
+	}
+}
+
+
 void CSampleDlg::OnTest()
 {	
 	deleteResultFile();
 	initSystem();
 	String path = RESULT_PATH;
 
-	//if (!videoCapture.isOpened())
-	//	initCamera();
-	//videoCapture.read(input);
+	if (!videoCapture.isOpened())
+		initCamera();
+	videoCapture.read(input);
 	if (input.empty()) {
 		String inputPath = RESULT_PATH + "input.bmp";
 		input = imread(inputPath, 1);
@@ -1041,6 +1147,9 @@ void CSampleDlg::OnTest()
 
 	//回路図の表示
 	showCircuitDiagram();
+
+	//回路のチェック
+	OnCheckCircle();
 
 	//画像保存
 	imshow("result", showResult);
@@ -2283,12 +2392,18 @@ void CSampleDlg::getBoardRect(const Mat input, Rect& area) {
 
 void CSampleDlg::OnHoukoku()
 {
-	Mat input = imread((String)RESULT_PATH + "4_concat.bmp", IMREAD_GRAYSCALE);
-	Mat edge;
-	Canny(input, edge, 10, 100);
+	Mat input = imread((String)RESULT_PATH + "test.bmp");
+	imwrite((String)RESULT_PATH + "test.png", input);
 
-	imshow("edge", edge);
-	imwrite((String)RESULT_PATH + "edge.bmp", edge);
+	Mat hsv;
+	cvtColor(input, hsv, CV_BGR2HSV);
+	Scalar sMin = Scalar(0, 0, 130);
+	Scalar sMax = Scalar(180, 20, 255);
+	Mat mask;
+	inRange(hsv, sMin, sMax, mask);
+
+	imshow("mask", mask);
+	imwrite((String)RESULT_PATH + "mask.bmp", mask);
 }
 
 void CSampleDlg::drawOnLine(OnLine line) {
