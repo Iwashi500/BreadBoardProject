@@ -171,5 +171,5 @@ for param in csv.values:
     drawVDD(d, point1, point2)
 
 d.draw()
-d.save('CircuitDiagram.svg')
+d.save('./Python/CircuitDiagram.svg')
 d.save('C:\\Users\\iwasi\\Desktop\\研究\\IWI\\結果\\CircuitDiagram.svg')

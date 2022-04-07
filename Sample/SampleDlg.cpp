@@ -990,7 +990,9 @@ void CSampleDlg::OnTest()
 	initSystem();
 	String path = RESULT_PATH;
 
-	if (!videoCapture.isOpened())
+	bool useCamera = false;
+
+	if (useCamera && !videoCapture.isOpened())
 		initCamera();
 	videoCapture.read(input);
 	if (input.empty()) {
@@ -1209,7 +1211,7 @@ void CSampleDlg::showCircuitDiagram() {
 		MessageBox(NULL, TEXT("コマンドが実行できません"), MB_OK);
 		return;
 	}
-	system("python CircuitDiagram.py");
+	system("python Python/CircuitDiagram.py");
 }
 
 void CSampleDlg::drawParts(Mat& result) {
