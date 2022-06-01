@@ -19,7 +19,7 @@ public:
 	//ダウンキャストのためにポインタで
 	//そもそも全部ポインタの方が良い？
 	vector<Part*> parts;
-	vector<Connection> connections;
+	vector<Connection*> connections;
 
 	static String getHoleName(Point position);
 

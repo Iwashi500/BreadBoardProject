@@ -130,7 +130,9 @@ public:
 	void createTestBoard();
 	void drawParts(Mat& result);
 	void showCircuitDiagram();
-	Connection selectLEDAnode(PartLED* led, Point p1, Point p2);
-	boolean judgeLEDAnode(PartLED* led, Point p1, Point p2, Connection& connect);
+	Connection* selectLEDAnode(PartLED* led, Point p1, Point p2);
+	boolean judgeLEDAnode(PartLED* led, Point p1, Point p2, Connection* connect);
 	afx_msg void OnCheckCircle();
+	afx_msg void OnBnClickedButton38();
+	afx_msg void OnCheckAnswer();
 };

@@ -198,9 +198,11 @@
   <ItemGroup>
     <ClInclude Include="BreadBoard.h" />
     <ClInclude Include="Connection.h" />
+    <ClInclude Include="ConnectionTransistor.h" />
     <ClInclude Include="PartCondenser.h" />
     <ClInclude Include="PartLED.h" />
     <ClInclude Include="PartSwitch.h" />
+    <ClInclude Include="PartTransistor.h" />
     <ClInclude Include="PartType.h" />
     <ClInclude Include="SchemDraw.h" />
     <ClInclude Include="framework.h" />
@@ -219,9 +221,11 @@
   <ItemGroup>
     <ClCompile Include="BreadBoard.cpp" />
     <ClCompile Include="Connection.cpp" />
+    <ClCompile Include="ConnectionTransistor.cpp" />
     <ClCompile Include="PartCondenser.cpp" />
     <ClCompile Include="PartLED.cpp" />
     <ClCompile Include="PartSwitch.cpp" />
+    <ClCompile Include="PartTransistor.cpp" />
     <ClCompile Include="PartType.cpp" />
     <ClCompile Include="SchemDraw.cpp" />
     <ClCompile Include="HoleType.cpp" />

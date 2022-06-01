@@ -24,5 +24,8 @@ public:
 	inline bool operator!=(const Connection chain) {
 		return !(*this == chain);
 	}
+
+	Connection() {};
+	virtual PartType getPartType() { return type; }
 };
 

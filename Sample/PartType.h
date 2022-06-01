@@ -14,6 +14,7 @@ public:
 		LED = 2,
 		CONDENSER = 3,
 		SWITCH = 4,
+		TRANSISTOR = 5,
 	};
 
 	PartType() {}
@@ -40,6 +41,9 @@ public:
 			break;
 		case Type::SWITCH:
 			return "switch";
+			break;
+		case Type::TRANSISTOR:
+			return "transistor";
 			break;
 		default:
 			return "unknown";

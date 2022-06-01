@@ -12,6 +12,8 @@
 #include "PartLED.h"
 #include "PartSwitch.h"
 #include "PartCondenser.h"
+#include "PartTransistor.h"
+#include "ConnectionTransistor.h"
 #include "iostream"
 #include <time.H>
 #include <string>
@@ -45,6 +47,7 @@
 #define PURPLE Scalar(255, 0, 255);
 #define LIGHTBLUE Scalar(255, 255, 0);
 #define WHITE Scalar(255, 255, 255)
+#define Orange Scalar(0, 165, 255);
 
 using namespace cv;
 using namespace std;
@@ -177,6 +180,7 @@ BEGIN_MESSAGE_MAP(CSampleDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON16, &CSampleDlg::OnCreateCutBoard)
 	ON_BN_CLICKED(IDC_BUTTON15, &CSampleDlg::OnHoukoku)
 	ON_BN_CLICKED(IDC_BUTTON37, &CSampleDlg::OnCheckCircle)
+	ON_BN_CLICKED(IDC_BUTTON38, &CSampleDlg::OnCheckAnswer)
 END_MESSAGE_MAP()
 
 
@@ -983,6 +987,11 @@ void CSampleDlg::OnCheckCircle()
 	}
 }
 
+void CSampleDlg::OnCheckAnswer()
+{
+	//MessageBox(TEXT("正解の回路と同一です。"), TEXT("OK"), MB_OK);
+	MessageBox(TEXT("正解の回路と異なる箇所があります。\n回路を確認してください。"), TEXT("注意"), MB_OK);
+}
 
 void CSampleDlg::OnTest()
 {	
@@ -1055,7 +1064,7 @@ void CSampleDlg::OnTest()
 	//HSV
 	Mat hsv;
 	cvtColor(concatInput, hsv, CV_BGR2HSV);
-	Scalar sMin = Scalar(0, 0, 130);
+	Scalar sMin = Scalar(0, 0, 110);
 	Scalar sMax = Scalar(180, 20, 255);
 	Mat mask;
 	inRange(hsv, sMin, sMax, mask);
@@ -1186,19 +1195,26 @@ void CSampleDlg::showCircuitDiagram() {
 	}
 
 	//ヘッダ(インポート、Drawing生成)
-	fputs("type,point1_x,point1_y,point2_x,point2_y\n", fp);
-	//fputws(L"type,point1_x,point1_y,point2_x,point2_y\n", fp);
+	fputs("type,point1_x,point1_y,point2_x,point2_y,point3_x,point3_y\n", fp);
 
 	for (auto connect : breadBoard.connections) {
-		fputs(connect.type.toString().c_str(), fp);
+		fputs(connect->type.toString().c_str(), fp);
 		fputs(",", fp);
-		fputs(to_string(connect.point1.x).c_str(), fp);
+		fputs(to_string(connect->point1.x).c_str(), fp);
 		fputs(",", fp);
-		fputs(to_string(connect.point1.y).c_str(), fp);
+		fputs(to_string(connect->point1.y).c_str(), fp);
 		fputs(",", fp);
-		fputs(to_string(connect.point2.x).c_str(), fp);
+		fputs(to_string(connect->point2.x).c_str(), fp);
 		fputs(",", fp);
-		fputs(to_string(connect.point2.y).c_str(), fp);
+		fputs(to_string(connect->point2.y).c_str(), fp);
+
+		if (connect->type.type == PartType::TRANSISTOR) {
+			ConnectionTransistor* trans = dynamic_cast<ConnectionTransistor*>(connect);
+			fputs(",", fp);
+			fputs(to_string(trans->point3.x).c_str(), fp);
+			fputs(",", fp);
+			fputs(to_string(trans->point3.y).c_str(), fp);
+		}
 		fputs("\n", fp);
 	}
 
@@ -1236,23 +1252,34 @@ void CSampleDlg::createTestBoard() {
 
 void CSampleDlg::drawLineConnect(Mat& result) {
 	for (auto connect : breadBoard.connections) {
-		Point hole1 = breadBoard.getHolePosition(connect.point1);
-		Point hole2 = breadBoard.getHolePosition(connect.point2);
+		Point hole1, hole2;
+		if (connect->type.type == PartType::TRANSISTOR) {
+			ConnectionTransistor* trans = dynamic_cast<ConnectionTransistor*>(connect);
+			hole1 = breadBoard.getHolePosition(trans->point1);
+			hole2 = breadBoard.getHolePosition(trans->point3);
+		}
+		else {
+			hole1 = breadBoard.getHolePosition(connect->point1);
+			hole2 = breadBoard.getHolePosition(connect->point2);
+		}
 		Scalar color;
-		if (connect.type.type == PartType::WIRE) {
+		if (connect->type.type == PartType::WIRE) {
 			color = GREEN;
 		}
-		else if (connect.type.type == PartType::RESISTOR) {
+		else if (connect->type.type == PartType::RESISTOR) {
 			color = YELLOW;
 		}
-		else if (connect.type.type == PartType::LED) {
+		else if (connect->type.type == PartType::LED) {
 			color = BLUE;
 		}
-		else if (connect.type.type == PartType::CONDENSER) {
+		else if (connect->type.type == PartType::CONDENSER) {
 			color = PURPLE;
 		}
-		else if (connect.type.type == PartType::SWITCH) {
+		else if (connect->type.type == PartType::SWITCH) {
 			color = LIGHTBLUE;
+		}
+		else if (connect->type.type == PartType::TRANSISTOR) {
+			color = Orange;
 		}
 		else {
 			color = RED;
@@ -1268,14 +1295,22 @@ void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
 	result = input.clone();
 
 	for (auto connect : breadBoard.connections) {
-		Point hole1 = breadBoard.getHolePosition(connect.point1);
-		Point hole2 = breadBoard.getHolePosition(connect.point2);
+		Point hole1, hole2;
+		if (connect->type.type == PartType::TRANSISTOR) {
+			ConnectionTransistor* trans = dynamic_cast<ConnectionTransistor*>(connect);
+			hole1 = breadBoard.getHolePosition(trans->point1);
+			hole2 = breadBoard.getHolePosition(trans->point3);
+		}
+		else {
+			hole1 = breadBoard.getHolePosition(connect->point1);
+			hole2 = breadBoard.getHolePosition(connect->point2);
+		}
 
-		if (connect.point1.y <= 1) {
+		if (connect->point1.y <= 1) {
 			hole1.x += leftTop.x;
 			hole1.y += leftTop.y;
 		}
-		else if (connect.point1.y <= 11) {
+		else if (connect->point1.y <= 11) {
 			hole1.x += leftTop.x;
 			hole1.y += leftTop.y + LINE_HEIGHT;
 		}
@@ -1284,11 +1319,11 @@ void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
 			hole1.y += leftTop.y + LINE_HEIGHT + LINE_HEIGHT;
 		}
 
-		if (connect.point2.y <= 1) {
+		if (connect->point2.y <= 1) {
 			hole2.x += leftTop.x;
 			hole2.y += leftTop.y;
 		}
-		else if (connect.point2.y <= 11) {
+		else if (connect->point2.y <= 11) {
 			hole2.x += leftTop.x;
 			hole2.y += leftTop.y + LINE_HEIGHT;
 		}
@@ -1298,20 +1333,23 @@ void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
 		}
 
 		Scalar color;
-		if (connect.type.type == PartType::WIRE) {
+		if (connect->type.type == PartType::WIRE) {
 			color = GREEN;
 		}
-		else if (connect.type.type == PartType::RESISTOR) {
+		else if (connect->type.type == PartType::RESISTOR) {
 			color = YELLOW;
 		}
-		else if (connect.type.type == PartType::LED){
+		else if (connect->type.type == PartType::LED){
 			color = BLUE;
 		}
-		else if (connect.type.type == PartType::CONDENSER) {
+		else if (connect->type.type == PartType::CONDENSER) {
 			color = PURPLE;
 		}
-		else if (connect.type.type == PartType::SWITCH) {
+		else if (connect->type.type == PartType::SWITCH) {
 			color = LIGHTBLUE;
+		}
+		else if (connect->type.type == PartType::TRANSISTOR) {
+			color = Orange;
 		}
 		else {
 			color = RED;
@@ -1323,36 +1361,12 @@ void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
 	}
 }
 
+Connection* createConnectionTransistor(Point p1, Point p2, Point p3) {
+	return new ConnectionTransistor(p1, p2, p3, PartType::TRANSISTOR);
+}
+
 void CSampleDlg::detectLineConnect() {
-	//まずは縦列
-	for (auto position : breadBoard.usedHoles) {
-		Point hole = breadBoard.holePositions.at(position.y).at(position.x);
-		HoleType holeType = breadBoard.holeTypes.at(position.y).at(position.x);
-
-		//+-エリアなら無視
-		if (position.y < 2 || 11 < position.y)
-			continue;
-
-		//端のみつなげる
-		if (holeType.type == HoleType::EDGE) {
-			for (int i = 1; i < 5; i++) {
-				int nextY = position.y + i;
-				//分断部分で終わる
-				if (nextY == 7 || nextY == 12)
-					break;
-
-				HoleType nextHoleType = breadBoard.holeTypes.at(nextY).at(position.x);
-				if (nextHoleType.type == HoleType::EDGE) {
-					Point nextHole = breadBoard.holePositions.at(nextY).at(position.x);
-					Point nextPosition = Point(position.x, position.y + i);
-					breadBoard.connections.push_back(Connection(position, nextPosition, PartType::WIRE));
-					break;
-				}
-			}
-		}
-	}
-
-	//次にパーツ毎
+	//はじめにパーツ毎
 	for (auto part : breadBoard.parts) {
 
 		//２端子パーツ
@@ -1372,11 +1386,11 @@ void CSampleDlg::detectLineConnect() {
 
 			if (edges.size() == 2) {
 				if(part->partType.type != PartType::LED)
-					breadBoard.connections.push_back(Connection(edges.at(0), edges.at(1), part->partType));
+					breadBoard.connections.push_back(new Connection(edges.at(0), edges.at(1), part->partType));
 				else {
 					//TODO:+-判定
 					PartLED* led = dynamic_cast<PartLED*>(part);
-					Connection connect = Connection(Point(0, 0), Point(0, 0), PartType::LED);
+					Connection* connect = new Connection(Point(0, 0), Point(0, 0), PartType::LED);
 					if (judgeLEDAnode(led, edges.at(0), edges.at(1), connect)) {
 						breadBoard.connections.push_back(connect);
 					}
@@ -1390,9 +1404,71 @@ void CSampleDlg::detectLineConnect() {
 				//TODO:2端子でないエラーはいったん置いとく
 				for (int i = 0; i < edges.size() - 1; i++) {
 					for (int j = i + 1; j < edges.size(); j++) {
-						breadBoard.connections.push_back(Connection(edges.at(i), edges.at(j), part->partType));
+						breadBoard.connections.push_back(new Connection(edges.at(i), edges.at(j), part->partType));
 					}
 				}
+			}
+		}
+		//3端子パーツ
+		else if (part->partType.type == PartType::TRANSISTOR) {
+			PartTransistor* trans = dynamic_cast<PartTransistor*>(part);
+			int top = INT_MAX;
+			int under = 0;
+			int left = INT_MAX;
+			int right = 0;
+
+			for (Point point : trans->holes) {
+				top = min(top, point.y);
+				under = max(under, point.y);
+				left = min(left, point.x);
+				right = max(right, point.x);
+			}
+
+			for (auto hole : trans->holes) {
+				breadBoard.holeTypes.at(hole.y).at(hole.x) = HoleType::MIDDLE;
+			}
+
+			auto holes = trans->holes;
+
+			if (trans->degree == 0) {
+				breadBoard.holeTypes.at(under).at(left) = HoleType::EDGE;
+				breadBoard.holeTypes.at(under).at(right) = HoleType::EDGE;
+				breadBoard.holeTypes.at(under).at(left + 1) = HoleType::EDGE;
+
+				Point leftUnder = Point(left, under);
+				Point rightUnder = Point(right, under);
+				Point centerUnder = Point(left+1, under);
+				auto result = find(holes.begin(), holes.end(), leftUnder);
+				if (result == holes.end())
+					trans->addHole(leftUnder);
+				result = find(holes.begin(), holes.end(), rightUnder);
+				if (result == holes.end())
+					trans->addHole(rightUnder);
+				result = find(holes.begin(), holes.end(), centerUnder);
+				if (result == holes.end())
+					trans->addHole(centerUnder);
+
+				breadBoard.connections.push_back(new  ConnectionTransistor(leftUnder, centerUnder, rightUnder, PartType::TRANSISTOR));
+			}
+			else {
+				breadBoard.holeTypes.at(top).at(left) = HoleType::EDGE;
+				breadBoard.holeTypes.at(top).at(right) = HoleType::EDGE;
+				breadBoard.holeTypes.at(top).at(left + 1) = HoleType::EDGE;
+
+				Point leftTop = Point(left, top);
+				Point  rightTop = Point(right, top);
+				Point centerTop = Point(left + 1, top);
+				auto result = find(holes.begin(), holes.end(), leftTop);
+				if (result == holes.end())
+					trans->addHole(leftTop);
+				result = find(holes.begin(), holes.end(), rightTop);
+				if (result == holes.end())
+					trans->addHole(rightTop);
+				result = find(holes.begin(), holes.end(), centerTop);
+				if (result == holes.end())
+					trans->addHole(centerTop);
+
+				breadBoard.connections.push_back(new  ConnectionTransistor(leftTop, centerTop, rightTop, PartType::TRANSISTOR));
 			}
 		}
 		//4端子パーツ
@@ -1432,16 +1508,44 @@ void CSampleDlg::detectLineConnect() {
 				swt->addHole(rightUnder);
 
 			if ((int)(swt->degree) % 180 == 0) {
-				breadBoard.connections.push_back(Connection(leftTop, rightTop, PartType::SWITCH));
-				breadBoard.connections.push_back(Connection(leftUnder, rightUnder, PartType::SWITCH));
-				breadBoard.connections.push_back(Connection(leftTop, leftUnder, PartType::WIRE));
-				breadBoard.connections.push_back(Connection(rightTop, rightUnder, PartType::WIRE));
+				breadBoard.connections.push_back(new Connection(leftTop, rightTop, PartType::SWITCH));
+				breadBoard.connections.push_back(new Connection(leftUnder, rightUnder, PartType::SWITCH));
+				breadBoard.connections.push_back(new Connection(leftTop, leftUnder, PartType::WIRE));
+				breadBoard.connections.push_back(new Connection(rightTop, rightUnder, PartType::WIRE));
 			}
 			else {
-				breadBoard.connections.push_back(Connection(leftTop, leftUnder, PartType::SWITCH));
-				breadBoard.connections.push_back(Connection(rightTop, rightUnder, PartType::SWITCH));
-				breadBoard.connections.push_back(Connection(leftTop, rightTop, PartType::WIRE));
-				breadBoard.connections.push_back(Connection(leftUnder, rightUnder, PartType::WIRE));
+				breadBoard.connections.push_back(new Connection(leftTop, leftUnder, PartType::SWITCH));
+				breadBoard.connections.push_back(new Connection(rightTop, rightUnder, PartType::SWITCH));
+				breadBoard.connections.push_back(new Connection(leftTop, rightTop, PartType::WIRE));
+				breadBoard.connections.push_back(new Connection(leftUnder, rightUnder, PartType::WIRE));
+			}
+		}
+	}
+
+	//最後に縦列
+	for (auto position : breadBoard.usedHoles) {
+		Point hole = breadBoard.holePositions.at(position.y).at(position.x);
+		HoleType holeType = breadBoard.holeTypes.at(position.y).at(position.x);
+
+		//+-エリアなら無視
+		if (position.y < 2 || 11 < position.y)
+			continue;
+
+		//端のみつなげる
+		if (holeType.type == HoleType::EDGE) {
+			for (int i = 1; i < 5; i++) {
+				int nextY = position.y + i;
+				//分断部分で終わる
+				if (nextY == 7 || nextY == 12)
+					break;
+
+				HoleType nextHoleType = breadBoard.holeTypes.at(nextY).at(position.x);
+				if (nextHoleType.type == HoleType::EDGE) {
+					Point nextHole = breadBoard.holePositions.at(nextY).at(position.x);
+					Point nextPosition = Point(position.x, position.y + i);
+					breadBoard.connections.push_back(new Connection(position, nextPosition, PartType::WIRE));
+					break;
+				}
 			}
 		}
 	}
@@ -1458,7 +1562,7 @@ void CSampleDlg::detectLineConnect() {
 ///		判定不可能：false
 ///		判定可能：true　(connectの中身が判定結果に更新)
 /// </returns>
-boolean CSampleDlg::judgeLEDAnode(PartLED* led, Point p1, Point p2, Connection& connect) {
+boolean CSampleDlg::judgeLEDAnode(PartLED* led, Point p1, Point p2, Connection* connect) {
 	Point point1 = breadBoard.holePositions.at(p1.y).at(p1.x);
 	Point point2 = breadBoard.holePositions.at(p2.y).at(p2.x);
 
@@ -1475,11 +1579,11 @@ boolean CSampleDlg::judgeLEDAnode(PartLED* led, Point p1, Point p2, Connection& 
 
 
 	if (p1Dis > p2Dis && p1Dis - p2Dis >= borderCanJudge) {
-		connect = Connection(p1, p2, PartType::LED);
+		connect = new Connection(p1, p2, PartType::LED);
 		return true;
 	}
 	else if (p2Dis > p1Dis && p2Dis - p1Dis >= borderCanJudge) {
-		connect = Connection(p2, p1, PartType::LED);
+		connect = new Connection(p2, p1, PartType::LED);
 		return true;
 	}
 
@@ -1495,7 +1599,7 @@ boolean CSampleDlg::judgeLEDAnode(PartLED* led, Point p1, Point p2, Connection& 
 /// <returns>
 ///		アノード側をpoint1、カソード側をpoint2にしたConnectionオブジェクト
 /// </returns>
-Connection CSampleDlg::selectLEDAnode(PartLED* led, Point p1, Point p2) {
+Connection* CSampleDlg::selectLEDAnode(PartLED* led, Point p1, Point p2) {
 	String windowName = "select anode(+)";
 	//String windowAll = "all";
 
@@ -1535,9 +1639,9 @@ Connection CSampleDlg::selectLEDAnode(PartLED* led, Point p1, Point p2) {
 			float p2Distance = norm(point2G - mouseClick);
 
 			if (p1Distance < p2Distance)
-				return Connection(p1, p2, PartType::LED);
+				return new Connection(p1, p2, PartType::LED);
 			else
-				return Connection(p2, p1, PartType::LED);
+				return new Connection(p2, p1, PartType::LED);
 		}
 	}
 }
@@ -1707,23 +1811,28 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 	Mat temp_resistor, temp_LED, temp_result;
 	Mat temp_con; //コンデンサー
 	Mat temp_switch;
+	Mat temp_trans; //トランジスター
 	temp_resistor = imread("./res/template/resistor_mask.bmp");
 	temp_LED = imread("./res/template/LED_mask.bmp");
 	temp_con = imread("./res/template/condenser_mask.bmp");
 	temp_switch = imread("./res/template/switch_mask.bmp");
-	//temp_switch = imread("./res/template/switch_temp.bmp");
+	temp_trans = imread("./res/template/transistor_mask.bmp");
+
 	Point resMaxPt;
 	Point LEDMaxPt;
 	Point conMaxPt;
 	Point swtMaxPt;
+	Point transMaxPt;
 	double resDeg;
 	double LEDDeg;
 	double conDeg;
 	double swtDeg;
+	double transDeg;
 	double resistorMaxVal = 0;
 	double LEDMaxVal = 0;
 	double condenserMaxVal = 0;
 	double switchMaxVal = 0;
+	double transMaxVal = 0;
 	double maxVal = 0;
 	String imagePath = RESULT_PATH + "temp\\";
 	String imageName = format("%d,%d", area.x, area.y);
@@ -1740,12 +1849,14 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 	int conSize = max(temp_con.rows, temp_con.cols);
 	int LEDSize = max(temp_LED.rows, temp_LED.cols);
 	int swtSize = max(temp_switch.rows, temp_switch.cols);
-	Point2f center_R, center_C, center_L, center_S;
+	int transSize = max(temp_trans.rows, temp_trans.cols);
+	Point2f center_R, center_C, center_L, center_S, center_T;
 	center_R = Point2f((resSize / 2), (resSize / 2));
 	center_C = Point2f((conSize / 2), (conSize / 2));
 	center_L = Point2f((LEDSize / 2), (LEDSize / 2));
 	center_S = Point2f((swtSize / 2), (swtSize / 2));
-	Mat move_R, move_C, move_L, move_S;
+	center_T = Point2f((transSize / 2), (transSize / 2));
+	Mat move_R, move_C, move_L, move_S, move_T;
 	move_R = (Mat_<double>(2, 3) << 1, 0, center_R.x - temp_resistor.cols / 2,
 		0, 1, center_R.y - temp_resistor.rows / 2);
 	move_C = (Mat_<double>(2, 3) << 1, 0, center_C.x - temp_con.cols / 2,
@@ -1754,32 +1865,37 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 		0, 1, center_L.y - temp_LED.rows / 2);
 	move_S = (Mat_<double>(2, 3) << 1, 0, center_S.x - temp_switch.cols / 2,
 		0, 1, center_S.y - temp_switch.rows / 2);
+	move_T = (Mat_<double>(2, 3) << 1, 0, center_T.x - temp_trans.cols / 2,
+		0, 1, center_T.y - temp_trans.rows / 2);
 
 
 	//テンプレ画像の回転
 	for (int i = 0; i < 1; i++) {
 		double degree = (double)i * 10;
-		Point resPt, LEDPt, conPt, swtPt;
-		double resVal, LEDVal, conVal, swtVal;
+		Point resPt, LEDPt, conPt, swtPt, transPt;
+		double resVal, LEDVal, conVal, swtVal, transVal;
 
 		//アフィン変換用のパラメータ(回転)
-		Mat rotate_R, rotate_C, rotate_L, rotate_S;
+		Mat rotate_R, rotate_C, rotate_L, rotate_S, rotate_T;
 		rotate_R = getRotationMatrix2D(center_R, degree, 1.0);
 		rotate_C = getRotationMatrix2D(center_C, degree, 1.0);
 		rotate_L = getRotationMatrix2D(center_L, degree, 1.0);
 		rotate_S = getRotationMatrix2D(center_S, degree, 1.0);
+		rotate_T = getRotationMatrix2D(center_T, degree, 1.0);
 
-		Mat temp_R, temp_C, temp_L, temp_S;
+		Mat temp_R, temp_C, temp_L, temp_S, temp_T;
 		//平行移動
 		warpAffine(temp_resistor, temp_R, move_R, Size(resSize, resSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
 		warpAffine(temp_con, temp_C, move_C, Size(conSize, conSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
 		warpAffine(temp_LED, temp_L, move_L, Size(LEDSize, LEDSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
 		warpAffine(temp_switch, temp_S, move_S, Size(swtSize, swtSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+		warpAffine(temp_trans, temp_T, move_T, Size(transSize, transSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
 		//回転
 		warpAffine(temp_R, temp_R, rotate_R, Size(resSize, resSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
 		warpAffine(temp_C, temp_C, rotate_C, Size(conSize, conSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
 		warpAffine(temp_L, temp_L, rotate_L, Size(LEDSize, LEDSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
 		warpAffine(temp_S, temp_S, rotate_S, Size(swtSize, swtSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+		warpAffine(temp_T, temp_T, rotate_T, Size(transSize, transSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
 
 		int method = CV_TM_CCOEFF_NORMED;
 
@@ -1830,9 +1946,21 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 				swtDeg = degree;
 			}
 		}
+
+		//トランジスタのテンプレートマッチング
+		if (input_mask.rows >= temp_C.rows
+			&& input_mask.cols >= temp_C.cols) {
+			matchTemplate(input_mask, temp_T, temp_result, method);
+			cv::minMaxLoc(temp_result, NULL, &transVal, NULL, &conPt);
+			if (transVal > transMaxVal) {
+				transMaxVal = transVal;
+				transMaxPt = transPt;
+				transDeg = degree;
+			}
+		}
 	}
 
-	maxVal = max(switchMaxVal, max(LEDMaxVal, max(resistorMaxVal, condenserMaxVal)));
+	maxVal = max(switchMaxVal, max(LEDMaxVal, max(resistorMaxVal, max(condenserMaxVal, transMaxVal))));
 
 	double border = 0.45;
 	if (maxVal < border)
@@ -1873,6 +2001,13 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 		rectangle(templete, roi, RED, 2);
 		imwrite(imagePath + imageName + ".bmp", templete);
 		return new PartSwitch(input.clone(), area, size, swtDeg);
+	}
+	else if (transMaxVal == maxVal) {
+		Rect roi(resMaxPt.x, resMaxPt.y, temp_trans.cols, temp_trans.rows);
+		Mat templete = input.clone();
+		rectangle(templete, roi, RED, 2);
+		imwrite(imagePath + imageName + ".bmp", templete);
+		return new PartTransistor(input.clone(), area, size, transDeg);
 	}
 
 	//エラー用のもの作る？

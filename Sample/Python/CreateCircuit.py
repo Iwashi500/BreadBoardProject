@@ -6,6 +6,7 @@ import schemdraw.elements as elm
 import math
 import pandas as pd
 import time
+import csv
 
 
 # パラメータ
@@ -15,6 +16,10 @@ svg_filename = 'Python/CircuitDiagram.svg'
 image_tag = "circuit_image"
 image_width = 640
 image_height = 800
+sample_path = "Python/sample-parameter.csv"
+csv_header = ['type', 'point1_x', 'point1_y', 'point2_x', 'point2_y']
+circuit_pos = 1
+circuit_row = 1
 # 回路制作
 d = schemdraw.Drawing(unit=1.0, inches_per_unit=0.5)
 d += (P := elm.Line().down().color(disable))
@@ -26,6 +31,17 @@ main_frame = ttk.Frame(root, padding=16)
 image = PhotoImage(file="Python/CircuitDiagram.png")
 canvas = Canvas(main_frame, width=image_width, height=image_height, bd=0,
                 highlightthickness=0, relief='ridge')
+# csvファイル
+file = open(sample_path, 'w', newline='')
+csv_writer = csv.writer(file)
+csv_writer.writerow(csv_header)
+
+
+def create_parameter(type):
+    global circuit_pos
+    res = [type, circuit_row, circuit_pos, circuit_row, circuit_pos + 1]
+    circuit_pos += 1
+    return res
 
 
 def update_image():
@@ -47,7 +63,7 @@ def click_resistor():
     d += elm.Resistor().color(enable).down()
     updateCircuit()
     update_image()
-    print('click resistor')
+    csv_writer.writerow(create_parameter('resistor'))
 
 
 def click_LED():
@@ -55,7 +71,7 @@ def click_LED():
     d += elm.LED().color(enable).down()
     updateCircuit()
     update_image()
-    print('click LED')
+    csv_writer.writerow(create_parameter('LED'))
 
 
 def click_condensor():
@@ -63,7 +79,16 @@ def click_condensor():
     d += elm.Capacitor().color(enable).down()
     updateCircuit()
     update_image()
-    print('click condensor')
+    csv_writer.writerow(create_parameter('condenser'))
+
+
+def click_end():
+    global d
+    d += elm.GND().color(enable).right()
+    updateCircuit()
+    update_image()
+    csv_writer.writerow(['wire', circuit_row, circuit_pos, circuit_row, 12])
+    file.close()
 
 
 # ウィジェットの作成
@@ -80,6 +105,10 @@ button_condensor = ttk.Button(
     button_frame,
     text='Condensor',
     command=lambda: click_condensor())
+button_end = ttk.Button(
+    button_frame,
+    text='GND(End)',
+    command=lambda: click_end())
 canvas.create_image(image_width / 2, image_height / 2,
                     image=image, tag=image_tag)
 # レイアウト
@@ -90,6 +119,7 @@ button_frame.pack(side=LEFT)
 button_resistor.pack(pady=pady)
 button_LED.pack(pady=pady)
 button_condensor.pack(pady=pady)
+button_end.pack(pady=pady)
 
 updateCircuit()
 update_image()

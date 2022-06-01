@@ -1,0 +1,16 @@
+type,point1_x,point1_y,point2_x,point2_y
+wire,7,1,7,2
+wire,7,2,7,4
+resistor,7,4,7,7
+wire,7,7,7,9
+wire,20,10,20,7
+resistor,20,7,26,7
+wire,26,7,26,11
+LED,7,9,11,9
+wire,11,9,11,11
+wire,14,11,14,9
+condenser,14,9,17,9
+wire,17,9,17,10
+wire,17,10,20,10
+wire,11,11,14,11
+wire,26,11,25,12

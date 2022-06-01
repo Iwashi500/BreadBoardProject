@@ -166,7 +166,16 @@ for param in csv.values:
             position[point1.index()].start,
             position[point2.index()].start
         )
-
+    elif param[0] == "transistor":
+        point3 = createPoint(param[5], param[6])
+        point3.x = int(point3.x)
+        point3.y = int(point3.y)
+        d += (T := elm.BjtNpn().color(enable).down().anchor(
+            "emitter").at(position[point1.index()].start))
+        d += elm.Line().color(enable).endpoints(
+            T.base, position[point3.index()].start)
+        d += elm.Line().color(enable).endpoints(
+            T.collector, position[point2.index()].start)
     drawGND(d, point1, point2)
     drawVDD(d, point1, point2)
 

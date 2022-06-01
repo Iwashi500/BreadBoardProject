@@ -110,23 +110,23 @@ BreadBoard::ErrorType BreadBoard::checkCircleError() {
 	queue<CheckPoint> que;
 	map<Connection, bool> dist;
 
-	for (const Connection connect : connections) {
+	for (const Connection* connect : connections) {
 		CheckPoint cp;
-		if (connect.point1.y == 1) {
-			cp.point = connect.point2;
+		if (connect->point1.y == 1) {
+			cp.point = connect->point2;
 			cp.isShort = true;
 			que.push(cp);
 			Connection c(Point(2, 3), Point(3, 4), PartType::WIRE);
-			dist[connect] = true;
+			dist[*connect] = true;
 		}
-		else if (connect.point2.y == 1) {
-			cp.point = connect.point1;
+		else if (connect->point2.y == 1) {
+			cp.point = connect->point1;
 			cp.isShort = true;
 			que.push(cp);
-			dist[connect] = true;
+			dist[*connect] = true;
 		}
 		else {
-			dist[connect] = false;
+			dist[*connect] = false;
 		}
 	}
 
