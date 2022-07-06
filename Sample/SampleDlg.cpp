@@ -1001,9 +1001,9 @@ void CSampleDlg::OnTest()
 
 	bool useCamera = false;
 
-	if (useCamera && !videoCapture.isOpened())
-		initCamera();
-	videoCapture.read(input);
+	//if (useCamera && !videoCapture.isOpened())
+	//	initCamera();
+	//videoCapture.read(input);
 	if (input.empty()) {
 		String inputPath = RESULT_PATH + "input.bmp";
 		input = imread(inputPath, 1);
@@ -1158,12 +1158,14 @@ void CSampleDlg::OnTest()
 
 	//回路図の表示
 	showCircuitDiagram();
+	Mat CircuitDiagram = imread("CircuitDiagram.png");
 
 	//回路のチェック
-	OnCheckCircle();
+	imshow("result", showResult);
+	imshow("circuit", CircuitDiagram);
+	//OnCheckCircle();
 
 	//画像保存
-	imshow("result", showResult);
 	imwrite(path + format("%d_", getFileIndex()) + "input.bmp", input);
 	imwrite(path + format("%d_", getFileIndex()) + "holeMask.bmp", boardMask);
 	imwrite(path + format("%d_", getFileIndex()) + "removeResult.bmp", removeResult);
@@ -1182,6 +1184,7 @@ void CSampleDlg::OnTest()
 	imwrite(path + format("%d_", getFileIndex()) + "lineConnect.bmp", lineConnect);
 	imwrite(path + format("%d_", getFileIndex()) + "holeTypeResult.bmp", holeTypeResult);
 	imwrite(path + format("%d_", getFileIndex()) + "lineConnectInput.bmp", lineConnectInput);
+	imwrite(path + format("%d_", getFileIndex()) + "CircuitDiagram.bmp", CircuitDiagram);
 	//imwrite(path + format("%d_", getFileIndex()) + "result.bmp", result);
 }
 
@@ -1208,7 +1211,7 @@ void CSampleDlg::showCircuitDiagram() {
 		fputs(",", fp);
 		fputs(to_string(connect->point2.y).c_str(), fp);
 
-		if (connect->type.type == PartType::TRANSISTOR) {
+		if (connect->type.type == PartType::TRAN_NPN || connect->type.type == PartType::TRAN_PNP) {
 			ConnectionTransistor* trans = dynamic_cast<ConnectionTransistor*>(connect);
 			fputs(",", fp);
 			fputs(to_string(trans->point3.x).c_str(), fp);
@@ -1250,10 +1253,14 @@ void CSampleDlg::createTestBoard() {
 	//}
 }
 
+bool CSampleDlg::isPartTypeTransistor(PartType type) {
+	return type.type == PartType::TRAN_NPN || type.type == PartType::TRAN_PNP;
+}
+
 void CSampleDlg::drawLineConnect(Mat& result) {
 	for (auto connect : breadBoard.connections) {
 		Point hole1, hole2;
-		if (connect->type.type == PartType::TRANSISTOR) {
+		if (isPartTypeTransistor(connect->type)) {
 			ConnectionTransistor* trans = dynamic_cast<ConnectionTransistor*>(connect);
 			hole1 = breadBoard.getHolePosition(trans->point1);
 			hole2 = breadBoard.getHolePosition(trans->point3);
@@ -1278,7 +1285,7 @@ void CSampleDlg::drawLineConnect(Mat& result) {
 		else if (connect->type.type == PartType::SWITCH) {
 			color = LIGHTBLUE;
 		}
-		else if (connect->type.type == PartType::TRANSISTOR) {
+		else if (isPartTypeTransistor(connect->type)) {
 			color = Orange;
 		}
 		else {
@@ -1296,7 +1303,7 @@ void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
 
 	for (auto connect : breadBoard.connections) {
 		Point hole1, hole2;
-		if (connect->type.type == PartType::TRANSISTOR) {
+		if (isPartTypeTransistor(connect->type)) {
 			ConnectionTransistor* trans = dynamic_cast<ConnectionTransistor*>(connect);
 			hole1 = breadBoard.getHolePosition(trans->point1);
 			hole2 = breadBoard.getHolePosition(trans->point3);
@@ -1348,7 +1355,7 @@ void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
 		else if (connect->type.type == PartType::SWITCH) {
 			color = LIGHTBLUE;
 		}
-		else if (connect->type.type == PartType::TRANSISTOR) {
+		else if (isPartTypeTransistor(connect->type)) {
 			color = Orange;
 		}
 		else {
@@ -1359,10 +1366,6 @@ void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
 		circle(result, hole1, 10, GREEN, -1);
 		circle(result, hole2, 10, GREEN, -1);
 	}
-}
-
-Connection* createConnectionTransistor(Point p1, Point p2, Point p3) {
-	return new ConnectionTransistor(p1, p2, p3, PartType::TRANSISTOR);
 }
 
 void CSampleDlg::detectLineConnect() {
@@ -1410,7 +1413,7 @@ void CSampleDlg::detectLineConnect() {
 			}
 		}
 		//3端子パーツ
-		else if (part->partType.type == PartType::TRANSISTOR) {
+		else if (part->partType.type == PartType::TRAN_NPN || part->partType.type == PartType::TRAN_PNP) {
 			PartTransistor* trans = dynamic_cast<PartTransistor*>(part);
 			int top = INT_MAX;
 			int under = 0;
@@ -1448,7 +1451,7 @@ void CSampleDlg::detectLineConnect() {
 				if (result == holes.end())
 					trans->addHole(centerUnder);
 
-				breadBoard.connections.push_back(new  ConnectionTransistor(leftUnder, centerUnder, rightUnder, PartType::TRANSISTOR));
+				breadBoard.connections.push_back(new  ConnectionTransistor(leftUnder, centerUnder, rightUnder, part->partType));
 			}
 			else {
 				breadBoard.holeTypes.at(top).at(left) = HoleType::EDGE;
@@ -1468,7 +1471,7 @@ void CSampleDlg::detectLineConnect() {
 				if (result == holes.end())
 					trans->addHole(centerTop);
 
-				breadBoard.connections.push_back(new  ConnectionTransistor(leftTop, centerTop, rightTop, PartType::TRANSISTOR));
+				breadBoard.connections.push_back(new  ConnectionTransistor(leftTop, centerTop, rightTop, part->partType));
 			}
 		}
 		//4端子パーツ
@@ -1870,6 +1873,7 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 
 
 	//テンプレ画像の回転
+	/* TODO:なぜ1になってる？*/
 	for (int i = 0; i < 1; i++) {
 		double degree = (double)i * 10;
 		Point resPt, LEDPt, conPt, swtPt, transPt;
@@ -1948,7 +1952,8 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 		}
 
 		//トランジスタのテンプレートマッチング
-		if (input_mask.rows >= temp_C.rows
+		if ((degree == 0 || degree == 180)
+			&& input_mask.rows >= temp_C.rows
 			&& input_mask.cols >= temp_C.cols) {
 			matchTemplate(input_mask, temp_T, temp_result, method);
 			cv::minMaxLoc(temp_result, NULL, &transVal, NULL, &conPt);
@@ -2007,11 +2012,25 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 		Mat templete = input.clone();
 		rectangle(templete, roi, RED, 2);
 		imwrite(imagePath + imageName + ".bmp", templete);
-		return new PartTransistor(input.clone(), area, size, transDeg);
+		PartType type = selectTransistorType(input);
+		return new PartTransistor(input.clone(), area, size, transDeg, type);
 	}
 
 	//エラー用のもの作る？
 	return new Part(input.clone(), area, size, PartType::WIRE);
+}
+
+PartType CSampleDlg::selectTransistorType(Mat part) {
+	String windowName = "select anode(+)";
+
+	//表示画像生成
+	namedWindow(windowName, WINDOW_NORMAL);
+	imshow(windowName, part);
+
+	int result = MessageBox(TEXT("トランジスタのタイプはPNPですか？"), TEXT("トランジスタの確認"), MB_YESNO);
+	
+	if (result == IDYES) return PartType::TRAN_PNP;
+	else return PartType::TRAN_NPN;
 }
 
 void CSampleDlg::removeLEDTop(Rect roi, Rect partArea) {

@@ -14,7 +14,8 @@ public:
 		LED = 2,
 		CONDENSER = 3,
 		SWITCH = 4,
-		TRANSISTOR = 5,
+		TRAN_NPN = 5,
+		TRAN_PNP = 6,
 	};
 
 	PartType() {}
@@ -42,8 +43,11 @@ public:
 		case Type::SWITCH:
 			return "switch";
 			break;
-		case Type::TRANSISTOR:
-			return "transistor";
+		case Type::TRAN_NPN:
+			return "transistor_npn";
+			break;
+		case Type::TRAN_PNP:
+			return "transistor_pnp";
 			break;
 		default:
 			return "unknown";

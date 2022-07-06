@@ -21,6 +21,6 @@ public:
 		return !(*this == chain);
 	}
 
-	PartType getPartType() override { return PartType::CONDENSER; }
+	PartType getPartType() override { return type; }
 };
 

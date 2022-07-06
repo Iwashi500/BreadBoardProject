@@ -14,13 +14,13 @@ class PartTransistor :
 public:
     double degree;
 
-    PartTransistor(Mat mat, Rect position, int size, double degree) {
+    PartTransistor(Mat mat, Rect position, int size, double degree, PartType type) {
         this->mat = mat;
         this->position = position;
         this->size = size;
-        this->partType = PartType::TRANSISTOR;
+        this->partType = type;
         this->degree = degree;
     }
 
-    PartType getPartType() override { return PartType::TRANSISTOR; }
+    PartType getPartType() override { return partType; }
 };

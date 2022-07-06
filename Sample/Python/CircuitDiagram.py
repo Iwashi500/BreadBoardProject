@@ -3,6 +3,17 @@ import schemdraw
 import schemdraw.elements as elm
 import math
 import pandas as pd
+from svglib.svglib import svg2rlg
+from reportlab.graphics import renderPDF, renderPM
+import sys
+import os
+
+
+def changeSVG2PNG(filename):
+    filename_without_ext = os.path.splitext(os.path.basename(filename))[0]
+    drawing = svg2rlg(filename)
+    renderPM.drawToFile(drawing,
+                        filename_without_ext + ".png", fmt="PNG")
 
 
 class Point:
@@ -166,7 +177,7 @@ for param in csv.values:
             position[point1.index()].start,
             position[point2.index()].start
         )
-    elif param[0] == "transistor":
+    elif param[0] == "transistor_npn":
         point3 = createPoint(param[5], param[6])
         point3.x = int(point3.x)
         point3.y = int(point3.y)
@@ -176,9 +187,21 @@ for param in csv.values:
             T.base, position[point3.index()].start)
         d += elm.Line().color(enable).endpoints(
             T.collector, position[point2.index()].start)
+    elif param[0] == "transistor_pnp":
+        point3 = createPoint(param[5], param[6])
+        point3.x = int(point3.x)
+        point3.y = int(point3.y)
+        d += (T := elm.BjtPnp().color(enable).down().anchor(
+            "emitter").at(position[point1.index()].start).flip())
+        d += elm.Line().color(enable).endpoints(
+            T.base, position[point3.index()].start)
+        d += elm.Line().color(enable).endpoints(
+            T.collector, position[point2.index()].start)
     drawGND(d, point1, point2)
     drawVDD(d, point1, point2)
 
-d.draw()
+
+# d.draw()
 d.save('./Python/CircuitDiagram.svg')
+changeSVG2PNG('./Python/CircuitDiagram.svg')
 d.save('C:\\Users\\iwasi\\Desktop\\研究\\IWI\\結果\\CircuitDiagram.svg')
