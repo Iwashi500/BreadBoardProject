@@ -13,6 +13,7 @@
 #include "PartSwitch.h"
 #include "PartCondenser.h"
 #include "PartTransistor.h"
+#include "PartIC8.h"
 #include "ConnectionTransistor.h"
 #include "iostream"
 #include <time.H>
@@ -44,10 +45,12 @@
 #define GREEN Scalar(0, 255, 0)
 #define RED Scalar(0, 0, 255)
 #define YELLOW Scalar(0, 255, 255)
-#define PURPLE Scalar(255, 0, 255);
+#define PURPLE Scalar(128, 0, 128);
 #define LIGHTBLUE Scalar(255, 255, 0);
 #define WHITE Scalar(255, 255, 255)
-#define Orange Scalar(0, 165, 255);
+#define ORANGE Scalar(0, 165, 255);
+#define GRAY Scalar(165, 165, 165);
+#define PINK Scalar(255, 0, 255);
 
 using namespace cv;
 using namespace std;
@@ -1001,9 +1004,9 @@ void CSampleDlg::OnTest()
 
 	bool useCamera = false;
 
-	//if (useCamera && !videoCapture.isOpened())
-	//	initCamera();
-	//videoCapture.read(input);
+	/*if (useCamera && !videoCapture.isOpened())
+		initCamera();*/
+	videoCapture.read(input);
 	if (input.empty()) {
 		String inputPath = RESULT_PATH + "input.bmp";
 		input = imread(inputPath, 1);
@@ -1144,14 +1147,8 @@ void CSampleDlg::OnTest()
 	Mat holeTypeResult = concatInput.clone();
 	drawHoleType(holeTypeResult);
 	//input画像への配線検出結果
-	Mat lineConnectInput;
+	Mat lineConnectInput = input.clone();
 	drawLineConnectInput(lineConnectInput, Point(boardArea.x, boardArea.y));
-
-	//Mat holeOnly, resultMask;
-	//absdiff(hole, holeTypeResult, holeOnly);
-	//inRange(holeOnly, Scalar(0, 0, 0), Scalar(1, 1, 1), resultMask);
-	//concatInput.copyTo(result, resultMask);
-	//result += holeOnly;
 
 	Mat showResult;
 	resize(lineConnectInput, showResult, Size(), 0.5, 0.5);
@@ -1166,26 +1163,34 @@ void CSampleDlg::OnTest()
 	//OnCheckCircle();
 
 	//画像保存
-	imwrite(path + format("%d_", getFileIndex()) + "input.bmp", input);
-	imwrite(path + format("%d_", getFileIndex()) + "holeMask.bmp", boardMask);
-	imwrite(path + format("%d_", getFileIndex()) + "removeResult.bmp", removeResult);
-	imwrite(path + format("%d_", getFileIndex()) + "concat.bmp", concatInput);
-	imwrite(path + format("%d_", getFileIndex()) + "hsv.bmp", hsv);
-	imwrite(path + format("%d_", getFileIndex()) + "mask.bmp", mask);
-	imwrite(path + format("%d_", getFileIndex()) + "erosion.bmp", erosion);
-	imwrite(path + format("%d_", getFileIndex()) + "reverse.bmp", reverse);
-	imwrite(path + format("%d_", getFileIndex()) + "labels.bmp", labels);
-	imwrite(path + format("%d_", getFileIndex()) + "filLabels.bmp", filLabels);
-	imwrite(path + format("%d_", getFileIndex()) + "filter.bmp", filter);
-	imwrite(path + format("%d_", getFileIndex()) + "hole.bmp", hole);
-	imwrite(path + format("%d_", getFileIndex()) + "holeDetect.bmp", holeDetect);
-	//imwrite(path + format("%d_", getFileIndex()) + "holeTypeResult.bmp", holeTypeResult);
-	imwrite(path + format("%d_", getFileIndex()) + "holeType.bmp", holeType);
-	imwrite(path + format("%d_", getFileIndex()) + "lineConnect.bmp", lineConnect);
-	imwrite(path + format("%d_", getFileIndex()) + "holeTypeResult.bmp", holeTypeResult);
-	imwrite(path + format("%d_", getFileIndex()) + "lineConnectInput.bmp", lineConnectInput);
-	imwrite(path + format("%d_", getFileIndex()) + "CircuitDiagram.bmp", CircuitDiagram);
-	//imwrite(path + format("%d_", getFileIndex()) + "result.bmp", result);
+	saveImageResult(input, "input");
+	saveImageResult(boardMask, "holeMask");
+	saveImageResult(removeResult, "removeResult");
+	saveImageResult(concatInput, "concat");
+	saveImageResult(hsv, "hsv");
+	saveImageResult(mask, "mask");
+	saveImageResult(erosion, "erosion");
+	saveImageResult(reverse, "reverse");
+	saveImageResult(labels, "labels");
+	saveImageResult(filLabels, "filLabels");
+	saveImageResult(filter, "filter");
+	saveImageResult(hole, "hole");
+	saveImageResult(holeDetect, "holeDetect");
+	saveImageResult(holeType, "holeType");
+	saveImageResult(lineConnect, "lineConnect");
+	saveImageResult(holeTypeResult, "holeTypeResult");
+	saveImageResult(lineConnectInput, "lineConnectInput");
+	saveImageResult(CircuitDiagram, "CircuitDiagram");
+}
+
+void CSampleDlg::saveImageResult(Mat image, String name) {
+	String path = RESULT_PATH;
+	imwrite(path + format("%d_", getFileIndex()) + name + ".bmp", image);
+}
+
+void CSampleDlg::saveImageTemp(Mat image, String name) {
+	String path = RESULT_PATH + "temp\\";
+	imwrite(path +  name + ".bmp", image);
 }
 
 void CSampleDlg::showCircuitDiagram() {
@@ -1257,50 +1262,17 @@ bool CSampleDlg::isPartTypeTransistor(PartType type) {
 	return type.type == PartType::TRAN_NPN || type.type == PartType::TRAN_PNP;
 }
 
-void CSampleDlg::drawLineConnect(Mat& result) {
-	for (auto connect : breadBoard.connections) {
-		Point hole1, hole2;
-		if (isPartTypeTransistor(connect->type)) {
-			ConnectionTransistor* trans = dynamic_cast<ConnectionTransistor*>(connect);
-			hole1 = breadBoard.getHolePosition(trans->point1);
-			hole2 = breadBoard.getHolePosition(trans->point3);
-		}
-		else {
-			hole1 = breadBoard.getHolePosition(connect->point1);
-			hole2 = breadBoard.getHolePosition(connect->point2);
-		}
-		Scalar color;
-		if (connect->type.type == PartType::WIRE) {
-			color = GREEN;
-		}
-		else if (connect->type.type == PartType::RESISTOR) {
-			color = YELLOW;
-		}
-		else if (connect->type.type == PartType::LED) {
-			color = BLUE;
-		}
-		else if (connect->type.type == PartType::CONDENSER) {
-			color = PURPLE;
-		}
-		else if (connect->type.type == PartType::SWITCH) {
-			color = LIGHTBLUE;
-		}
-		else if (isPartTypeTransistor(connect->type)) {
-			color = Orange;
-		}
-		else {
-			color = RED;
-		}
+bool CSampleDlg::isPartTypeIC(PartType type) {
+	return type.type == PartType::IC8 || type.type == PartType::IC14;
+}
 
-		line(result, hole1, hole2, color, 3);
-		circle(result, hole1, 10, GREEN, -1);
-		circle(result, hole2, 10, GREEN, -1);
-	}
+Point NO_INPUT = Point(-1, -1);
+
+void CSampleDlg::drawLineConnect(Mat& result) {
+	drawLineConnectInput(result, NO_INPUT);
 }
 
 void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
-	result = input.clone();
-
 	for (auto connect : breadBoard.connections) {
 		Point hole1, hole2;
 		if (isPartTypeTransistor(connect->type)) {
@@ -1313,30 +1285,32 @@ void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
 			hole2 = breadBoard.getHolePosition(connect->point2);
 		}
 
-		if (connect->point1.y <= 1) {
-			hole1.x += leftTop.x;
-			hole1.y += leftTop.y;
-		}
-		else if (connect->point1.y <= 11) {
-			hole1.x += leftTop.x;
-			hole1.y += leftTop.y + LINE_HEIGHT;
-		}
-		else {
-			hole1.x += leftTop.x;
-			hole1.y += leftTop.y + LINE_HEIGHT + LINE_HEIGHT;
-		}
+		if (leftTop != NO_INPUT) {
+			if (connect->point1.y <= 1) {
+				hole1.x += leftTop.x;
+				hole1.y += leftTop.y;
+			}
+			else if (connect->point1.y <= 11) {
+				hole1.x += leftTop.x;
+				hole1.y += leftTop.y + LINE_HEIGHT;
+			}
+			else {
+				hole1.x += leftTop.x;
+				hole1.y += leftTop.y + LINE_HEIGHT + LINE_HEIGHT;
+			}
 
-		if (connect->point2.y <= 1) {
-			hole2.x += leftTop.x;
-			hole2.y += leftTop.y;
-		}
-		else if (connect->point2.y <= 11) {
-			hole2.x += leftTop.x;
-			hole2.y += leftTop.y + LINE_HEIGHT;
-		}
-		else {
-			hole2.x += leftTop.x;
-			hole2.y += leftTop.y + LINE_HEIGHT + LINE_HEIGHT;
+			if (connect->point2.y <= 1) {
+				hole2.x += leftTop.x;
+				hole2.y += leftTop.y;
+			}
+			else if (connect->point2.y <= 11) {
+				hole2.x += leftTop.x;
+				hole2.y += leftTop.y + LINE_HEIGHT;
+			}
+			else {
+				hole2.x += leftTop.x;
+				hole2.y += leftTop.y + LINE_HEIGHT + LINE_HEIGHT;
+			}
 		}
 
 		Scalar color;
@@ -1356,7 +1330,19 @@ void CSampleDlg::drawLineConnectInput(Mat& result, Point leftTop) {
 			color = LIGHTBLUE;
 		}
 		else if (isPartTypeTransistor(connect->type)) {
-			color = Orange;
+			color = ORANGE;
+		}
+		else if (isPartTypeIC(connect->type)) {
+			color = GRAY;
+			Point hole3 = Point(hole2.x, hole1.y);
+			Point hole4 = Point(hole1.x, hole2.y);
+			line(result, hole1, hole3, color, 3);
+			line(result, hole1, hole4, color, 3);
+			line(result, hole2, hole3, color, 3);
+			line(result, hole2, hole4, color, 3);
+			line(result, hole3, hole4, color, 3);
+			circle(result, hole3, 10, GREEN, -1);
+			circle(result, hole4, 10, GREEN, -1);
 		}
 		else {
 			color = RED;
@@ -1413,7 +1399,7 @@ void CSampleDlg::detectLineConnect() {
 			}
 		}
 		//3端子パーツ
-		else if (part->partType.type == PartType::TRAN_NPN || part->partType.type == PartType::TRAN_PNP) {
+		else if (isPartTypeTransistor(part->partType)) {
 			PartTransistor* trans = dynamic_cast<PartTransistor*>(part);
 			int top = INT_MAX;
 			int under = 0;
@@ -1522,6 +1508,47 @@ void CSampleDlg::detectLineConnect() {
 				breadBoard.connections.push_back(new Connection(leftTop, rightTop, PartType::WIRE));
 				breadBoard.connections.push_back(new Connection(leftUnder, rightUnder, PartType::WIRE));
 			}
+		}
+		//ic
+		else if (isPartTypeIC(part->partType)) {
+			int top = INT_MAX;
+			int under = 0;
+			int left = INT_MAX;
+			int right = 0;
+
+			for (Point point : part->holes) {
+				top = min(top, point.y);
+				under = max(under, point.y);
+				left = min(left, point.x);
+				right = max(right, point.x);
+			}
+			if (part->partType.type == PartType::IC14) {
+				left++;
+				right--;
+			}
+			Point leftTop = Point(left, top);
+			Point leftUnder = Point(left, under);
+			Point rightTop = Point(right, top);
+			Point rightUnder = Point(right, under);
+			for (int p = left; p <= right; p++) {
+				breadBoard.holeTypes.at(top).at(p) = HoleType::EDGE;
+				breadBoard.holeTypes.at(under).at(p) = HoleType::EDGE;
+			}
+			auto holes = part->holes;
+			auto result = find(holes.begin(), holes.end(), leftTop);
+			if (result == holes.end())
+				part->addHole(leftTop);
+			result = find(holes.begin(), holes.end(), leftUnder);
+			if (result == holes.end())
+				part->addHole(leftUnder);
+			result = find(holes.begin(), holes.end(), rightTop);
+			if (result == holes.end())
+				part->addHole(rightTop);
+			result = find(holes.begin(), holes.end(), rightUnder);
+			if (result == holes.end())
+				part->addHole(rightUnder);
+
+			breadBoard.connections.push_back(new Connection(leftTop, rightUnder, part->partType));
 		}
 	}
 
@@ -1772,12 +1799,17 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 	//PartType type;
 	Mat hsv;
 	cvtColor(input, hsv, CV_RGB2HSV);
+	int debug = 0;
 
 	//単色判定(銅線)
-	for (int r = 0; r < 36; r++) {
-		int range = r * 5;
-		Scalar hmin = Scalar(range, 1, 1);
-		Scalar hmax = Scalar(range + 10, 255, 255);
+	float singleColorRation = 0.8;
+	int singleColorRange = 20;
+	int singleColorDistance = 10;
+	int singleColorDivision = 360 / singleColorDistance;
+	for (int r = 0; r < singleColorDivision; r++) {
+		int rangeBase = r * singleColorDistance;
+		Scalar hmin = Scalar(rangeBase, 0, 50);
+		Scalar hmax = Scalar(rangeBase + singleColorRange, 255, 255);
 		Mat mask;
 		inRange(hsv, hmin, hmax, mask);
 
@@ -1793,8 +1825,7 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 			}
 		}
 
-		float ratio = 0.8;
-		if (count >= size * ratio) {
+		if (count >= size * singleColorRation) {
 			return new Part(input.clone(), area, size, PartType::WIRE);
 		}
 	}
@@ -1811,33 +1842,31 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 	morphologyEx(input_mask, input_mask, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(5, 5)));
 	cvtColor(input_mask, input_mask, CV_GRAY2BGR);
 
-	Mat temp_resistor, temp_LED, temp_result;
-	Mat temp_con; //コンデンサー
-	Mat temp_switch;
-	Mat temp_trans; //トランジスター
-	temp_resistor = imread("./res/template/resistor_mask.bmp");
-	temp_LED = imread("./res/template/LED_mask.bmp");
-	temp_con = imread("./res/template/condenser_mask.bmp");
-	temp_switch = imread("./res/template/switch_mask.bmp");
-	temp_trans = imread("./res/template/transistor_mask.bmp");
+	vector<String> partNames{ "resistor", "LED", "condenser", "switch", "transistor", "ic8", "ic16" };
+	int partTypeSize = partNames.size();
+	map<String, Mat> partTemp;
+	map<String, Point> partMaxPt;
+	map<String, double> partDeg;
+	map<String, double> partMaxVal;
+	map<String, int> partSize;
+	map<String, Point2f> partCenter;
+	map<String, Mat> partMove;
+	Mat temp_result;
 
-	Point resMaxPt;
-	Point LEDMaxPt;
-	Point conMaxPt;
-	Point swtMaxPt;
-	Point transMaxPt;
-	double resDeg;
-	double LEDDeg;
-	double conDeg;
-	double swtDeg;
-	double transDeg;
-	double resistorMaxVal = 0;
-	double LEDMaxVal = 0;
-	double condenserMaxVal = 0;
-	double switchMaxVal = 0;
-	double transMaxVal = 0;
-	double maxVal = 0;
-	String imagePath = RESULT_PATH + "temp\\";
+	for (String name : partNames) {
+		String pathName = "./res/template/" + name + "_mask.bmp";
+		Mat part = imread(pathName);
+		int size = max(part.rows, part.cols);
+		Point2f center = Point2f((size / 2), (size / 2));
+		Mat move = (Mat_<double>(2, 3) << 1, 0, center.x - part.cols / 2,
+			0, 1, center.y - part.rows / 2);
+		partTemp[name] = part;
+		partSize[name] = size;
+		partCenter[name] = center;
+		partMove[name] = move;
+		partMaxVal[name] = 0;
+	}
+
 	String imageName = format("%d,%d", area.x, area.y);
 
 	//画像の拡張に対して、areaを変更
@@ -1846,175 +1875,118 @@ Part* CSampleDlg::judgePartType(Mat input, int size, Rect area) {
 	area.width += extSize * 2;
 	area.height += extSize * 2;
 
-
-	//アフィン変換用のパラメータ(平行移動)
-	int resSize = max(temp_resistor.rows, temp_resistor.cols);
-	int conSize = max(temp_con.rows, temp_con.cols);
-	int LEDSize = max(temp_LED.rows, temp_LED.cols);
-	int swtSize = max(temp_switch.rows, temp_switch.cols);
-	int transSize = max(temp_trans.rows, temp_trans.cols);
-	Point2f center_R, center_C, center_L, center_S, center_T;
-	center_R = Point2f((resSize / 2), (resSize / 2));
-	center_C = Point2f((conSize / 2), (conSize / 2));
-	center_L = Point2f((LEDSize / 2), (LEDSize / 2));
-	center_S = Point2f((swtSize / 2), (swtSize / 2));
-	center_T = Point2f((transSize / 2), (transSize / 2));
-	Mat move_R, move_C, move_L, move_S, move_T;
-	move_R = (Mat_<double>(2, 3) << 1, 0, center_R.x - temp_resistor.cols / 2,
-		0, 1, center_R.y - temp_resistor.rows / 2);
-	move_C = (Mat_<double>(2, 3) << 1, 0, center_C.x - temp_con.cols / 2,
-		0, 1, center_C.y - temp_con.rows / 2);
-	move_L = (Mat_<double>(2, 3) << 1, 0, center_L.x - temp_LED.cols / 2,
-		0, 1, center_L.y - temp_LED.rows / 2);
-	move_S = (Mat_<double>(2, 3) << 1, 0, center_S.x - temp_switch.cols / 2,
-		0, 1, center_S.y - temp_switch.rows / 2);
-	move_T = (Mat_<double>(2, 3) << 1, 0, center_T.x - temp_trans.cols / 2,
-		0, 1, center_T.y - temp_trans.rows / 2);
-
-
 	//テンプレ画像の回転
 	/* TODO:なぜ1になってる？*/
 	for (int i = 0; i < 1; i++) {
 		double degree = (double)i * 10;
-		Point resPt, LEDPt, conPt, swtPt, transPt;
-		double resVal, LEDVal, conVal, swtVal, transVal;
-
-		//アフィン変換用のパラメータ(回転)
-		Mat rotate_R, rotate_C, rotate_L, rotate_S, rotate_T;
-		rotate_R = getRotationMatrix2D(center_R, degree, 1.0);
-		rotate_C = getRotationMatrix2D(center_C, degree, 1.0);
-		rotate_L = getRotationMatrix2D(center_L, degree, 1.0);
-		rotate_S = getRotationMatrix2D(center_S, degree, 1.0);
-		rotate_T = getRotationMatrix2D(center_T, degree, 1.0);
-
-		Mat temp_R, temp_C, temp_L, temp_S, temp_T;
-		//平行移動
-		warpAffine(temp_resistor, temp_R, move_R, Size(resSize, resSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
-		warpAffine(temp_con, temp_C, move_C, Size(conSize, conSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
-		warpAffine(temp_LED, temp_L, move_L, Size(LEDSize, LEDSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
-		warpAffine(temp_switch, temp_S, move_S, Size(swtSize, swtSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
-		warpAffine(temp_trans, temp_T, move_T, Size(transSize, transSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
-		//回転
-		warpAffine(temp_R, temp_R, rotate_R, Size(resSize, resSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
-		warpAffine(temp_C, temp_C, rotate_C, Size(conSize, conSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
-		warpAffine(temp_L, temp_L, rotate_L, Size(LEDSize, LEDSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
-		warpAffine(temp_S, temp_S, rotate_S, Size(swtSize, swtSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
-		warpAffine(temp_T, temp_T, rotate_T, Size(transSize, transSize), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
-
+		map<String, Mat> partRotate;
+		map<String, Mat> partAffine;
 		int method = CV_TM_CCOEFF_NORMED;
 
-		//抵抗のテンプレートマッチング
-		if (input_mask.rows >= temp_R.rows
-			&& input_mask.cols >= temp_R.cols) {
-			matchTemplate(input_mask, temp_R, temp_result, method);
-			cv::minMaxLoc(temp_result, NULL, &resVal, NULL, &resPt);
-			if (resVal > resistorMaxVal) {
-				resistorMaxVal = resVal;
-				resMaxPt = resPt;
-				resDeg = degree;
-			}
-		}
+		for (String name : partNames) {
+			Point partPt;
+			double partVal;
+			Mat rotate = getRotationMatrix2D(partCenter[name], degree, 1.0);
+			partRotate[name] = rotate;
+			Mat affine; 
+			//平行移動
+			warpAffine(partTemp[name], affine, partMove[name], Size(partSize[name], partSize[name]), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
+			//回転
+			warpAffine(affine, affine, partRotate[name], Size(partSize[name], partSize[name]), INTER_CUBIC, BORDER_CONSTANT, Scalar(0, 0, 0));
 
-		//LEDのテンプレートマッチング
-		if (input_mask.rows >= temp_L.rows
-			&& input_mask.cols >= temp_L.cols) {
-			matchTemplate(input_mask, temp_L, temp_result, method);
-			cv::minMaxLoc(temp_result, NULL, &LEDVal, NULL, &LEDPt);
-			if (LEDVal > LEDMaxVal) {
-				LEDMaxVal = LEDVal;
-				LEDMaxPt = LEDPt;
-				LEDDeg = degree;
-			}
-		}
-
-		//コンデンサーのテンプレートマッチング
-		if (input_mask.rows >= temp_C.rows
-			&& input_mask.cols >= temp_C.cols) {
-			matchTemplate(input_mask, temp_C, temp_result, method);
-			cv::minMaxLoc(temp_result, NULL, &conVal, NULL, &conPt);
-			if (conVal > condenserMaxVal) {
-				condenserMaxVal = conVal;
-				conMaxPt = conPt;
-				conDeg = degree;
-			}
-		}
-
-		//スイッチのテンプレートマッチング
-		if (input_mask.rows >= temp_S.rows
-			&& input_mask.cols >= temp_S.cols) {
-			matchTemplate(input_mask, temp_S, temp_result, method);
-			cv::minMaxLoc(temp_result, NULL, &swtVal, NULL, &swtPt);
-			if (swtVal > switchMaxVal) {
-				switchMaxVal = swtVal;
-				swtMaxPt = swtPt;
-				swtDeg = degree;
-			}
-		}
-
-		//トランジスタのテンプレートマッチング
-		if ((degree == 0 || degree == 180)
-			&& input_mask.rows >= temp_C.rows
-			&& input_mask.cols >= temp_C.cols) {
-			matchTemplate(input_mask, temp_T, temp_result, method);
-			cv::minMaxLoc(temp_result, NULL, &transVal, NULL, &conPt);
-			if (transVal > transMaxVal) {
-				transMaxVal = transVal;
-				transMaxPt = transPt;
-				transDeg = degree;
+			//テンプレートマッチング
+			if (input_mask.rows >= affine.rows
+				&& input_mask.cols >= affine.cols) {
+				matchTemplate(input_mask, affine, temp_result, method);
+				minMaxLoc(temp_result, NULL, &partVal, NULL, &partPt);
+				if (partVal > partMaxVal[name]) {
+					partMaxVal[name] = partVal;
+					partMaxPt[name] = partPt;
+					partDeg[name] = degree;
+				}
 			}
 		}
 	}
 
-	maxVal = max(switchMaxVal, max(LEDMaxVal, max(resistorMaxVal, max(condenserMaxVal, transMaxVal))));
+	double maxVal = 0;
+	String matchName;
+	for (String name : partNames) {
+		if (maxVal < partMaxVal[name]) {
+			maxVal = partMaxVal[name];
+			matchName = name;
+		}
+	}
 
 	double border = 0.45;
 	if (maxVal < border)
 		return new Part(input.clone(), area, size, PartType::WIRE);
 
-	if (resistorMaxVal == maxVal) {
-		Rect roi(resMaxPt.x, resMaxPt.y, temp_resistor.cols, temp_resistor.rows);
+	//resistor
+	if (matchName == partNames[0]) {
+		Rect roi(partMaxPt[matchName].x, partMaxPt[matchName].y, partTemp[matchName].cols, partTemp[matchName].rows);
 		Mat templete = input.clone();
 		rectangle(templete, roi, RED, 2);
-		imwrite(imagePath + imageName + ".bmp", templete);
+		saveImageTemp(templete, imageName);
 		return new Part(input.clone(), area, size, PartType::RESISTOR);
 	}
-	else if (LEDMaxVal == maxVal) {
+	//LED
+	else if (matchName == partNames[1]) {
 		//頭頂部の端穴を削除
-		Rect roi(LEDMaxPt.x, LEDMaxPt.y, temp_LED.cols, temp_LED.rows);
+		Rect roi(partMaxPt[matchName].x, partMaxPt[matchName].y, partTemp[matchName].cols, partTemp[matchName].rows);
 		Mat templete = input_dst.clone();
 		rectangle(templete, roi, RED, 2);
-		imwrite(imagePath + imageName + ".bmp", templete);
+		saveImageTemp(templete, imageName);
 		removeLEDTop(roi, area);
 		Mat head = Mat(input_dst, roi);
 		Point headPosition = Point(roi.x, roi.y);
 		return new PartLED(input.clone(), area, size, head, headPosition);
 	}
-	else if (condenserMaxVal == maxVal) {
+	//condenser
+	else if (matchName == partNames[2]) {
 		//頭頂部の端穴を削除
-		Rect roi(conMaxPt.x, conMaxPt.y, temp_con.cols, temp_con.rows);
+		Rect roi(partMaxPt[matchName].x, partMaxPt[matchName].y, partTemp[matchName].cols, partTemp[matchName].rows);
 		Mat templete = input_dst.clone();
 		rectangle(templete, roi, RED, 2);
-		imwrite(imagePath + imageName + ".bmp", templete);
+		saveImageTemp(templete, imageName);
 		removeLEDTop(roi, area);
 		Mat head = Mat(input_dst, roi);
 		Point headPosition = Point(roi.x, roi.y);
 		return new PartCondenser(input.clone(), area, size, head, headPosition);
 	}
-	else if (switchMaxVal == maxVal) {
-		Rect roi(resMaxPt.x, resMaxPt.y, temp_switch.cols, temp_switch.rows);
+	// switch
+	else if (matchName == partNames[3]) {
+		Rect roi(partMaxPt[matchName].x, partMaxPt[matchName].y, partTemp[matchName].cols, partTemp[matchName].rows);
 		Mat templete = input.clone();
 		rectangle(templete, roi, RED, 2);
-		imwrite(imagePath + imageName + ".bmp", templete);
-		return new PartSwitch(input.clone(), area, size, swtDeg);
+		saveImageTemp(templete, imageName);
+		return new PartSwitch(input.clone(), area, size, partDeg[matchName]);
 	}
-	else if (transMaxVal == maxVal) {
-		Rect roi(resMaxPt.x, resMaxPt.y, temp_trans.cols, temp_trans.rows);
+	//transistor
+	else if (matchName == partNames[4]) {
+		Rect roi(partMaxPt[matchName].x, partMaxPt[matchName].y, partTemp[matchName].cols, partTemp[matchName].rows);
 		Mat templete = input.clone();
 		rectangle(templete, roi, RED, 2);
-		imwrite(imagePath + imageName + ".bmp", templete);
+		saveImageTemp(templete, imageName);
 		PartType type = selectTransistorType(input);
-		return new PartTransistor(input.clone(), area, size, transDeg, type);
+		return new PartTransistor(input.clone(), area, size, partDeg[matchName], type);
 	}
+	//ic8
+	else if (matchName == partNames[5]) {
+		Rect roi(partMaxPt[matchName].x, partMaxPt[matchName].y, partTemp[matchName].cols, partTemp[matchName].rows);
+		Mat templete = input.clone();
+		rectangle(templete, roi, RED, 2);
+		saveImageTemp(templete, imageName);
+		return new Part(input.clone(), area, size, PartType::IC8);
+	}
+	//ic16
+	else if (matchName == partNames[6]) {
+		Rect roi(partMaxPt[matchName].x, partMaxPt[matchName].y, partTemp[matchName].cols, partTemp[matchName].rows);
+		Mat templete = input.clone();
+		rectangle(templete, roi, RED, 2);
+		saveImageTemp(templete, imageName);
+		return new Part(input.clone(), area, size, PartType::IC14);
+	}
+
 
 	//エラー用のもの作る？
 	return new Part(input.clone(), area, size, PartType::WIRE);
@@ -2028,6 +2000,7 @@ PartType CSampleDlg::selectTransistorType(Mat part) {
 	imshow(windowName, part);
 
 	int result = MessageBox(TEXT("トランジスタのタイプはPNPですか？"), TEXT("トランジスタの確認"), MB_YESNO);
+	destroyWindow(windowName);
 	
 	if (result == IDYES) return PartType::TRAN_PNP;
 	else return PartType::TRAN_NPN;

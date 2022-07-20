@@ -200,6 +200,7 @@
     <ClInclude Include="Connection.h" />
     <ClInclude Include="ConnectionTransistor.h" />
     <ClInclude Include="PartCondenser.h" />
+    <ClInclude Include="PartIC8.h" />
     <ClInclude Include="PartLED.h" />
     <ClInclude Include="PartSwitch.h" />
     <ClInclude Include="PartTransistor.h" />
@@ -223,6 +224,7 @@
     <ClCompile Include="Connection.cpp" />
     <ClCompile Include="ConnectionTransistor.cpp" />
     <ClCompile Include="PartCondenser.cpp" />
+    <ClCompile Include="PartIC8.cpp" />
     <ClCompile Include="PartLED.cpp" />
     <ClCompile Include="PartSwitch.cpp" />
     <ClCompile Include="PartTransistor.cpp" />

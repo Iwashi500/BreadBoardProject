@@ -136,4 +136,7 @@ public:
 	afx_msg void OnCheckAnswer();
 	PartType selectTransistorType(Mat part);
 	bool isPartTypeTransistor(PartType type);
+	void saveImageResult(Mat image, String name);
+	void saveImageTemp(Mat image, String name);
+	bool isPartTypeIC(PartType type);
 };

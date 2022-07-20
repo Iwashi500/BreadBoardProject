@@ -127,7 +127,7 @@ def drawVDD(d, point1, point2):
 disable = 'white'
 enable = 'black'
 
-d = schemdraw.Drawing(unit=1.0, inches_per_unit=0.5)
+d = schemdraw.Drawing(unit=1.0, inches_per_unit=0.4)
 d += (P := elm.Line().down().color(disable))
 position = [P]*30*14
 
@@ -197,6 +197,62 @@ for param in csv.values:
             T.base, position[point3.index()].start)
         d += elm.Line().color(enable).endpoints(
             T.collector, position[point2.index()].start)
+    elif param[0] == "ic8":
+        point3 = createPoint(point1.x+1, point1.y)
+        d += elm.Line().color(enable).endpoints(
+            position[point3.index()].start,
+            position[point3.index()].start)
+        d += (H := elm.Header(rows=4, cols=2,
+              numbering="ccw", shownumber=True).color(enable).up().anchor("pin7"))
+        d += elm.Line().color(enable).endpoints(H.pin8,
+                                                position[point1.index()].start)
+        d += elm.Line().color(enable).endpoints(H.pin6,
+                                                position[point1.index()+2].start)
+        d += elm.Line().color(enable).endpoints(H.pin5,
+                                                position[point1.index()+3].start)
+        d += elm.Line().color(enable).endpoints(H.pin4,
+                                                position[point2.index()].start)
+        d += elm.Line().color(enable).endpoints(H.pin3,
+                                                position[point2.index()-1].start)
+        d += elm.Line().color(enable).endpoints(H.pin2,
+                                                position[point2.index()-2].start)
+        d += elm.Line().color(enable).endpoints(H.pin1,
+                                                position[point2.index()-3].start)
+    elif param[0] == "ic14":
+        point3 = createPoint(point1.x+3, point1.y)
+        d += elm.Line().color(disable).endpoints(
+            position[point3.index()].start,
+            position[point3.index()].start)
+        d += elm.Line().color(disable).down().length(0.2)
+        d += (H := elm.Header(rows=7, cols=2,
+              numbering="ccw", shownumber=True).color(enable).up().anchor("pin11"))
+        d += elm.Line().color(enable).endpoints(H.pin14,
+                                                position[point1.index()].start)
+        d += elm.Line().color(enable).endpoints(H.pin13,
+                                                position[point1.index()+1].start)
+        d += elm.Line().color(enable).endpoints(H.pin12,
+                                                position[point1.index()+2].start)
+        d += elm.Line().color(enable).endpoints(H.pin10,
+                                                position[point1.index()+4].start)
+        d += elm.Line().color(enable).endpoints(H.pin9,
+                                                position[point1.index()+5].start)
+        d += elm.Line().color(enable).endpoints(H.pin8,
+                                                position[point1.index()+6].start)
+        d += elm.Line().color(enable).endpoints(H.pin7,
+                                                position[point2.index()].start)
+        d += elm.Line().color(enable).endpoints(H.pin6,
+                                                position[point2.index()-1].start)
+        d += elm.Line().color(enable).endpoints(H.pin5,
+                                                position[point2.index()-2].start)
+        d += elm.Line().color(enable).endpoints(H.pin4,
+                                                position[point2.index()-3].start)
+        d += elm.Line().color(enable).endpoints(H.pin3,
+                                                position[point2.index()-4].start)
+        d += elm.Line().color(enable).endpoints(H.pin2,
+                                                position[point2.index()-5].start)
+        d += elm.Line().color(enable).endpoints(H.pin1,
+                                                position[point2.index()-6].start)
+
     drawGND(d, point1, point2)
     drawVDD(d, point1, point2)
 

@@ -16,6 +16,8 @@ public:
 		SWITCH = 4,
 		TRAN_NPN = 5,
 		TRAN_PNP = 6,
+		IC8 = 7,
+		IC14 = 8,
 	};
 
 	PartType() {}
@@ -48,6 +50,12 @@ public:
 			break;
 		case Type::TRAN_PNP:
 			return "transistor_pnp";
+			break;
+		case Type::IC8:
+			return "ic8";
+			break;
+		case Type::IC14:
+			return "ic14";
 			break;
 		default:
 			return "unknown";
